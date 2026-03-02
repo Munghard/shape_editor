@@ -1,0 +1,1 @@
+- [] hovered segment change colors or highlight knobs

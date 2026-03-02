@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+
+.colorSelect {
+  @apply w-8 h-8;
+}
+
+.panel {
+  @apply flex flex-col gap-4 justify-start p-4 border-2 border-black text-start bg-zinc-800;
+}
+
+.panel2 {
+  @apply flex flex-col gap-4 justify-start p-4 border-2 border-black text-start bg-zinc-900;
+}
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
