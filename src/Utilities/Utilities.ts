@@ -1,10 +1,10 @@
-import type { Vector2 } from "../components/Shape";
+import type { Point } from "../components/Shape";
 
 
 export function lerp(a: number, b: number, t: number): number {
     return a + (b - a) * t;
 }
-export function lerpVec2(a: Vector2, b: Vector2, t: number): Vector2 {
+export function lerpVec2(a: Point, b: Point, t: number): Point {
     return {
         x: lerp(a.x, b.x, t),
         y: lerp(a.y, b.y, t)

@@ -1,11 +1,11 @@
 import type { Shape } from "../components/Shape";
 
-export default function getHoveredSegment(icon: Shape, threshold: number, mouseX: number, mouseY: number) {
+export default function getHoveredSegment(icon: Shape, threshold: number, mouseX: number, mouseY: number, selectedPathIndex: number) {
     if (!icon) return -1;
 
-    for (let i = 0; i < icon.points.length - 1; i++) {
-        const a = icon.points[i];
-        const b = icon.points[i + 1];
+    for (let i = 0; i < icon.paths[selectedPathIndex].points.length - 1; i++) {
+        const a = icon.paths[selectedPathIndex].points[i];
+        const b = icon.paths[selectedPathIndex].points[i + 1];
 
         const dist = distanceToSegment(
             mouseX, mouseY,

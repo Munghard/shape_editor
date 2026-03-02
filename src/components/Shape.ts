@@ -1,5 +1,8 @@
 export type Shape = {
-    points: Vector2[];
+    paths: {
+        points: Point[];
+        isHole: boolean;
+    }[]
 
     cyclic: boolean;
 
@@ -10,13 +13,17 @@ export type Shape = {
     fillColor: string;
     useFill: boolean;
 }
-export type Vector2 = {
+export type Point = {
     x: number;
     y: number;
 }
+
 export function CreateDefaultShape(): Shape {
     return {
-        points: [],
+        paths: [{
+            points: [],
+            isHole: false,
+        }],
         cyclic: true,
         fillColor: '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'),
         strokeColor: "#ffffff",
@@ -27,33 +34,35 @@ export function CreateDefaultShape(): Shape {
 
 }
 
-export function DrawShape(shape: Shape) {
-    if (shape.points.length <= 0) return;
-    var c = document.getElementById("Canvas") as HTMLCanvasElement;
-    if (!c) return;
-
-    var ctx = c.getContext("2d");
-    if (!ctx) return;
+export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
+    if (shape.paths.length === 0) return;
 
     ctx.beginPath();
-    ctx.strokeStyle = shape.strokeColor;
-    ctx.moveTo(shape.points[0].x, shape.points[0].y);
 
-    for (let i = 1; i < shape.points.length; i++) {
-        const p = shape.points[i];
-        ctx.lineTo(p.x, p.y);
-    };
-    if (shape.cyclic) {
-        ctx.lineTo(shape.points[0].x, shape.points[0].y);
-    }
+    shape.paths.forEach(path => {
+        const points = path.points;
+        if (points.length === 0) return;
+
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+
+        if (shape.cyclic) {
+            ctx.closePath();
+        }
+    });
 
     ctx.lineWidth = shape.strokeWidth;
+    ctx.strokeStyle = shape.strokeColor;
+    ctx.fillStyle = shape.fillColor;
+
+    if (shape.useFill) {
+        ctx.fill("evenodd"); // THIS is where holes work
+    }
 
     if (shape.useStroke) {
         ctx.stroke();
-    }
-    ctx.fillStyle = shape.fillColor;
-    if (shape.useFill) {
-        ctx.fill();
     }
 }
