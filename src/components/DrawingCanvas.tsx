@@ -18,10 +18,10 @@ export default function DrawingCanvas() {
 
     //SHAPE
 
-    const [shapeIndex, setShapeIndex] = useState<number>(0);
+    const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(0);
     const [shapes, setShapes] = useState<Shape[]>([CreateDefaultShape()]);
 
-    const shape = shapes[shapeIndex];
+    const shape = shapes[selectedShapeIndex];
 
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
@@ -104,7 +104,7 @@ export default function DrawingCanvas() {
     function handleRemovePoint(index: number) {
         setShapes(prev =>
             prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
+                if (i !== selectedShapeIndex) return s;
 
                 const newPaths = [...s.paths];
                 const currentPath = newPaths[selectedPathIndex];
@@ -170,7 +170,7 @@ export default function DrawingCanvas() {
 
         setShapes(prev =>
             prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
+                if (i !== selectedShapeIndex) return s;
 
                 const newPaths = [...s.paths];
                 const currentPath = newPaths[selectedPathIndex];
@@ -229,7 +229,7 @@ export default function DrawingCanvas() {
 
             setShapes(prev =>
                 prev.map((s, i) => {
-                    if (i !== shapeIndex) return s;
+                    if (i !== selectedShapeIndex) return s;
 
                     const newPaths = [...s.paths];
                     const currentPath = newPaths[selectedPathIndex];
@@ -261,7 +261,7 @@ export default function DrawingCanvas() {
 
         setShapes(prev =>
             prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
+                if (i !== selectedShapeIndex) return s;
 
                 const newPaths = [...s.paths];
                 const currentPath = newPaths[selectedPathIndex];
@@ -420,26 +420,26 @@ export default function DrawingCanvas() {
         const shape: Shape = CreateDefaultShape();
 
         setShapes(prev => [...prev, shape]);
-        setShapeIndex(shapes.length);
+        setSelectedShapeIndex(shapes.length);
         setSelectedPathIndex(0);
     }
 
     function DeleteSelectedShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         setShapes(prev => [...prev.filter(s => s !== shape)]);
-        setShapeIndex(prev => Math.max(prev - 1, 0));
+        setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
     }
 
     // update shape helper
     function updateSelectedShape(updater: (shape: Shape) => Shape) {
         setShapes(prev =>
-            prev.map((s, i) => (i === shapeIndex ? updater(s) : s))
+            prev.map((s, i) => (i === selectedShapeIndex ? updater(s) : s))
         );
     }
 
     function AddNewPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         setShapes(prev =>
             prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
+                if (i !== selectedShapeIndex) return s;
 
                 const newPaths = [
                     ...s.paths,
@@ -449,12 +449,12 @@ export default function DrawingCanvas() {
             })
 
         );
-        setSelectedPathIndex(shapes[shapeIndex].paths.length);
+        setSelectedPathIndex(shapes[selectedShapeIndex].paths.length);
     }
     function DeleteSelectedPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         setShapes(prev =>
             prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
+                if (i !== selectedShapeIndex) return s;
 
                 const newPaths = [
                     ...s.paths.filter((_p, i) => i !== selectedPathIndex)
@@ -465,6 +465,32 @@ export default function DrawingCanvas() {
         setSelectedPathIndex(prev => Math.max(prev - 1, 0));
     }
 
+    function moveForward() {
+        setShapes(prev => {
+            const index = selectedShapeIndex;
+            if (index === -1 || index >= prev.length - 1) return prev;
+
+            const copy = [...prev];
+            [copy[index], copy[index + 1]] =
+                [copy[index + 1], copy[index]];
+
+            setSelectedShapeIndex(index + 1);
+            return copy;
+        });
+    }
+    function moveBackward() {
+        setShapes(prev => {
+            const index = selectedShapeIndex;
+            if (index <= 0) return prev;
+
+            const copy = [...prev];
+            [copy[index], copy[index - 1]] =
+                [copy[index - 1], copy[index]];
+
+            setSelectedShapeIndex(index - 1);
+            return copy;
+        });
+    }
     return (
         <>
             {/* Tools */}
@@ -486,20 +512,14 @@ export default function DrawingCanvas() {
                             shape && shape.paths[selectedPathIndex].points.map((p, i) => {
                                 if (canvasRect == null) return;
                                 const selected = selectedPointIndex === i;
-                                const last = shape.paths[selectedPathIndex].points.length - 1 === i;
-                                const first = 0 === i;
                                 var _knobSize = selected ? knobSize * 2 : knobSize;
                                 var bgColor =
-                                    selected ? 'bg-lime-500/80' :
-                                        last ? 'bg-red-500/80' :
-                                            first ? ' bg-amber-300/50' :
-                                                ' bg-blue-300/50';
+                                    selected ? 'bg-zinc-200/90' :
+                                        ' bg-zinc-200/50';
 
                                 var bgHoverColor =
-                                    selected ? 'hover:bg-lime-200/80' :
-                                        last ? 'hover:bg-pink-500/80' :
-                                            first ? ' hover:bg-yellow-300/50' :
-                                                'hover:bg-cyan-300/50'
+                                    selected ? 'hover:bg-zinc-100/90' :
+                                        'hover:bg-zinc-100/50'
 
                                 const x = p.x - (_knobSize * 0.5);
                                 const y = p.y - (_knobSize * 0.5);
@@ -607,10 +627,16 @@ export default function DrawingCanvas() {
                 <div className="panel2">
                     <h2>Shape</h2>
                     <p>Shapes: {shapes.length}</p>
-                    <p>Shape:
-                        <input className="ml-2 w-[10ch]" type="number" value={shapeIndex} min={0} max={shapes.length - 1} onChange={(e) => { setShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
+                    <p>Selected shape:
+                        <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
                     </p>
                     <div className="flex flex-row gap-2">
+                        <p>Order:</p>
+                        <button onClick={moveForward}><i className="fa fa-arrow-up"></i></button>
+                        <button onClick={moveBackward}><i className="fa fa-arrow-down"></i></button>
+                    </div>
+                    <div className="flex flex-row gap-2">
+                        <p>Add/Remove shape:</p>
                         <button title="Add shape" onClick={AddNewShape}><i className="fa fa-circle-plus"></i></button>
                         <button title="Delete shape" onClick={DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
                     </div>
@@ -620,7 +646,7 @@ export default function DrawingCanvas() {
 
                     <h2>Paths</h2>
                     <p>Path:
-                        <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={shapes[shapeIndex].paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
+                        <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={shapes[selectedShapeIndex].paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
                     </p>
                     <div className="flex flex-row gap-2">
                         <button title="Add path" onClick={AddNewPath}><i className="fa fa-circle-plus"></i></button>
@@ -762,7 +788,7 @@ export default function DrawingCanvas() {
 
                         <button title="Save" onClick={SaveShape}><i className="fa-solid fa-floppy-disk"></i></button>
                         <button title="Load" onClick={LoadShape}><i className="fa-solid fa-folder"></i></button>
-                        <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
+                        <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
                     </div>
                 </div>
             </div>
