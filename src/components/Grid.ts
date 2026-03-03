@@ -19,7 +19,7 @@ export function DrawGrid(subdivision: number, canvasWidth: number, canvasHeight:
         ctx.moveTo(xPos, 0);
         ctx.lineTo(xPos, canvasHeight);
         ctx.strokeStyle = "gray";
-        ctx.strokeText(`${xPos.toFixed(1)}`, xPos + 2, 10);
+        // ctx.strokeText(`${xPos.toFixed(1)}`, xPos + 2, 10);
     }
 
     for (let y = 0; y < subdivision; y++) {
@@ -28,8 +28,7 @@ export function DrawGrid(subdivision: number, canvasWidth: number, canvasHeight:
         ctx.moveTo(0, yPos);
         ctx.lineTo(canvasWidth, yPos);
         ctx.strokeStyle = "gray";
-        ctx.strokeText(`${yPos.toFixed(1)}`, 2, yPos - 2);
-
+        // ctx.strokeText(`${yPos.toFixed(1)}`, 2, yPos - 2);
     };
     ctx.lineWidth = 1;
     ctx.strokeStyle = "black";

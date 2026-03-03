@@ -182,16 +182,19 @@ export default function DrawingCanvas() {
             // we are hovering a valid segment
             if (seg !== -1) {
                 // draw a knob in the middle
-                var start = shape.paths[selectedPathIndex].points[seg];
-                var end = shape.paths[selectedPathIndex].points[seg + 1];
+                const path = shape.paths[selectedPathIndex];
+                const n = path.points.length;
+                const start = path.points[seg];
+                const end = path.points[(seg + 1) % n]; // loops back to first point if last
+
                 var pos = lerpVec2(start, end, 0.5);
+
                 ctx.beginPath();
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
                 ctx.lineWidth = 2;
                 ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-                ctx.arc(pos.x, pos.y, threshold, Math.PI * 2, 0);
+                ctx.arc(pos.x, pos.y, threshold, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.closePath();
                 ctx.stroke();
             }
         }
@@ -287,13 +290,24 @@ export default function DrawingCanvas() {
         let x = e.clientX - rect.left;
         let y = e.clientY - rect.top;
 
+        const path = shape.paths[selectedPathIndex];
         if (selectedSegment !== -1) {
-            var start = shape.paths[selectedPathIndex].points[selectedSegment];
-            var end = shape.paths[selectedPathIndex].points[selectedSegment + 1];
-            var pos = lerpVec2(start, end, 0.5);
-            insertPointAt(selectedSegment, pos.x, pos.y);
-            setSelectedPointIndex(selectedSegment + 1);
-            startDragging(selectedSegment + 1);
+            const n = path.points.length;
+            const start = path.points[selectedSegment];
+            const end = path.points[(selectedSegment + 1) % n];
+
+            if (end) {
+                const pos = lerpVec2(start, end, 0.5);
+                insertPointAt(selectedSegment, pos.x, pos.y);
+                setSelectedPointIndex(selectedSegment + 1);
+                startDragging(selectedSegment + 1);
+            } else {
+                // last point: just append a new point
+                const newPoint = { x: start.x + 10, y: start.y }; // arbitrary direction
+                insertPointAt(path.points.length, newPoint.x, newPoint.y);
+                setSelectedPointIndex(path.points.length);
+                startDragging(path.points.length);
+            }
         }
         else {
             // CREATE POINT
