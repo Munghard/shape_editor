@@ -2,9 +2,9 @@ DONE
 - [x] hovered segment change colors or highlight knobs
 - [x] make all knobs the same color, confusing with first and last being different
 - [x] order shape in array (forward, backward)
+- [x] better ux for selecting shapes and paths, implement select, insert and move tools
 
 TODO
-- [ ] better ux for selecting shapes and paths, implement select and insert tools
 - [ ] open recent files
 - [ ] logic for adding points on last segment index (cyclic)
 - [ ] size of canvas
