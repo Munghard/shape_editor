@@ -493,48 +493,52 @@ export default function DrawingCanvas() {
     }
     return (
         <>
-            {/* Tools */}
-            <div id="TOOLS" className="panel fixed left-0 top-0 overflow-auto h-screen">
-                <div className="flex flex-col gap-2">
-                    <h2>Tools</h2>
-                    <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select"><i className="fa-solid fa-arrow-pointer"></i></button>
-                    <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
-                    <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert"><i className="fa-regular fa-hand-point-left"></i></button>
-                    <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete"><i className="fa-solid fa-eraser"></i></button>
+            <div className="flex flex-row gap-4 justify-between ">
+                {/* Tools */}
+                <div id="TOOLS" className="panel  overflow-auto h-screen">
+                    <div className="flex flex-col gap-2">
+                        <h2>Tools</h2>
+                        <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select"><i className="fa-solid fa-arrow-pointer"></i></button>
+                        <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert"><i className="fa-regular fa-hand-point-left"></i></button>
+                        <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                        <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete"><i className="fa-solid fa-eraser"></i></button>
+                    </div>
                 </div>
-            </div>
-            {/* Knobs */}
-            <div className="flex flex-row gap-4">
-                <div className="flex flex-col gap-4">
-                    <div id="CombinedCanvas" className="relative inline-block">
+                <div id="middle_column" className="flex flex-col gap-2 justify-around ">
+                    <div className='top-0 fixed'>
+                        <h1 className='mb-10 text-zinc-400'>Shape editor</h1>
+                    </div>
+                    {/* Knobs */}
+                    <div className="flex flex-col gap-4">
+                        <div id="CombinedCanvas" className="relative inline-block">
 
-                        {showKnobs &&
-                            shape && shape.paths[selectedPathIndex].points.map((p, i) => {
-                                if (canvasRect == null) return;
-                                const selected = selectedPointIndex === i;
-                                var _knobSize = selected ? knobSize * 2 : knobSize;
-                                var bgColor =
-                                    selected ? 'bg-zinc-200/90' :
-                                        ' bg-zinc-200/50';
+                            {showKnobs &&
+                                shape && shape.paths[selectedPathIndex].points.map((p, i) => {
+                                    if (canvasRect == null) return;
+                                    const selected = selectedPointIndex === i;
+                                    var _knobSize = selected ? knobSize * 2 : knobSize;
+                                    var bgColor =
+                                        selected ? 'bg-zinc-200/90' :
+                                            ' bg-zinc-200/50';
 
-                                var bgHoverColor =
-                                    selected ? 'hover:bg-zinc-100/90' :
-                                        'hover:bg-zinc-100/50'
+                                    var bgHoverColor =
+                                        selected ? 'hover:bg-zinc-100/90' :
+                                            'hover:bg-zinc-100/50'
 
-                                const x = p.x - (_knobSize * 0.5);
-                                const y = p.y - (_knobSize * 0.5);
-                                return (
-                                    <div
-                                        key={i}
-                                        onMouseDown={() => { startDragging(i); setSelectedPointIndex(i); }}
-                                        style={{
-                                            top: y,
-                                            left: x,
-                                            width: _knobSize,
-                                            height: _knobSize
-                                        }}
-                                        className={
-                                            `
+                                    const x = p.x - (_knobSize * 0.5);
+                                    const y = p.y - (_knobSize * 0.5);
+                                    return (
+                                        <div
+                                            key={i}
+                                            onMouseDown={() => { startDragging(i); setSelectedPointIndex(i); }}
+                                            style={{
+                                                top: y,
+                                                left: x,
+                                                width: _knobSize,
+                                                height: _knobSize
+                                            }}
+                                            className={
+                                                `
                                 rounded-full
                                 absolute z-9999
                                 ${bgColor}
@@ -543,255 +547,256 @@ export default function DrawingCanvas() {
                                 border-white/50
                                 hover:border-white
                                 `
-                                        }></div>
-                                )
-                            })
+                                            }></div>
+                                    )
+                                })
+                            }
+
+                            {/* Canvas */}
+                            <div style={{ width: canvasWidth, height: canvasHeight, scale: zoom }} className="relative" >
+
+                                <canvas
+                                    id="CanvasOverlay"
+                                    width={canvasWidth}
+                                    height={canvasHeight}
+                                    style={{ top: 0, left: 0 }}
+                                    className="absolute  pointer-events-none z-20"
+                                />
+                                <canvas
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onWheel={handleScroll}
+                                    id="Canvas"
+                                    ref={canvasRef}
+                                    width={canvasWidth}
+                                    height={canvasHeight}
+                                    style={{ top: 0, left: 0 }}
+                                    className="border border-black  absolute z-10"
+                                />
+                                <canvas
+                                    id="CanvasGrid"
+                                    width={canvasWidth}
+                                    height={canvasHeight}
+                                    style={{ top: 0, left: 0, background: `${bgColor}` }}
+                                    className="absolute pointer-events-none z-0 "
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {/* Controls */}
+                <div className="panel overflow-auto h-screen">
+                    {/* Selected point */}
+                    <div className="panel2">
+                        <h2 >Selected point</h2>
+                        <div className="flex flex-row gap-2 ">
+                            <input className="w-[10ch]" type="number" value={selectedPointIndex} onChange={handleSelectPoint}></input>
+                            <button title="Delete point" onClick={() => handleRemovePoint(selectedPointIndex)}><i className="fa-solid fa-x"></i></button>
+                        </div>
+                        {selectedPointIndex !== -1 && selectedPoint && shape &&
+                            (
+                                <div className="flex flex-row gap-2">
+                                    <div className="flex flex-row gap-2">
+                                        <label>X:</label>
+                                        <input
+                                            className="w-[10ch]"
+                                            type="number"
+                                            value={selectedPoint.x.toFixed(3)}
+                                            onChange={(e) =>
+                                                MovePoint(
+                                                    selectedPointIndex,
+                                                    { x: Number(e.target.value), y: selectedPoint.y }
+                                                )}
+                                        ></input>
+                                    </div>
+                                    <div className="flex flex-row gap-2">
+                                        <label>Y:</label>
+                                        <input
+                                            className="w-[10ch]"
+                                            type="number"
+                                            value={selectedPoint.y.toFixed(3)}
+                                            onChange={(e) =>
+                                                MovePoint(
+                                                    selectedPointIndex,
+                                                    { x: selectedPoint.x, y: Number(e.target.value) }
+                                                )}
+                                        ></input>
+                                    </div>
+                                </div>
+                            )
                         }
 
-                        {/* Canvas */}
-                        <div style={{ width: canvasWidth, height: canvasHeight, scale: zoom }} className="relative" >
-
-                            <canvas
-                                id="CanvasOverlay"
-                                width={canvasWidth}
-                                height={canvasHeight}
-                                style={{ top: 0, left: 0 }}
-                                className="absolute  pointer-events-none z-20"
-                            />
-                            <canvas
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onWheel={handleScroll}
-                                id="Canvas"
-                                ref={canvasRef}
-                                width={canvasWidth}
-                                height={canvasHeight}
-                                style={{ top: 0, left: 0 }}
-                                className="border border-black  absolute z-10"
-                            />
-                            <canvas
-                                id="CanvasGrid"
-                                width={canvasWidth}
-                                height={canvasHeight}
-                                style={{ top: 0, left: 0, background: `${bgColor}` }}
-                                className="absolute pointer-events-none z-0 "
-                            />
+                    </div>
+                    <div className="panel2">
+                        <h2>Shape</h2>
+                        <p>Shapes: {shapes.length}</p>
+                        <p>Selected shape:
+                            <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
+                        </p>
+                        <div className="flex flex-row gap-2">
+                            <p>Order:</p>
+                            <button onClick={moveForward}><i className="fa fa-arrow-up"></i></button>
+                            <button onClick={moveBackward}><i className="fa fa-arrow-down"></i></button>
+                        </div>
+                        <div className="flex flex-row gap-2">
+                            <p>Add/Remove shape:</p>
+                            <button title="Add shape" onClick={AddNewShape}><i className="fa fa-circle-plus"></i></button>
+                            <button title="Delete shape" onClick={DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
                         </div>
                     </div>
-                </div>
-            </div>
+                    <div className="panel2">
 
-            {/* Controls */}
-            <div className="panel fixed right-0 top-0 overflow-auto h-screen">
-                {/* Selected point */}
-                <div className="panel2">
-                    <h2 >Selected point</h2>
-                    <div className="flex flex-row gap-2 ">
-                        <input className="w-[10ch]" type="number" value={selectedPointIndex} onChange={handleSelectPoint}></input>
-                        <button title="Delete point" onClick={() => handleRemovePoint(selectedPointIndex)}><i className="fa-solid fa-x"></i></button>
-                    </div>
-                    {selectedPointIndex !== -1 && selectedPoint && shape &&
-                        (
+
+                        <h2>Paths</h2>
+                        <p>Path:
+                            <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={shapes[selectedShapeIndex].paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
+                        </p>
+                        <div className="flex flex-row gap-2">
+                            <button title="Add path" onClick={AddNewPath}><i className="fa fa-circle-plus"></i></button>
+                            <button title="Delete path" onClick={DeleteSelectedPath}><i className="fa fa-circle-minus"></i></button>
+                        </div>
+                        {/* Line color */}
+                        <div className="flex flex-col">
+                            <label>Stroke</label>
                             <div className="flex flex-row gap-2">
-                                <div className="flex flex-row gap-2">
-                                    <label>X:</label>
-                                    <input
-                                        className="w-[10ch]"
-                                        type="number"
-                                        value={selectedPoint.x.toFixed(3)}
-                                        onChange={(e) =>
-                                            MovePoint(
-                                                selectedPointIndex,
-                                                { x: Number(e.target.value), y: selectedPoint.y }
-                                            )}
-                                    ></input>
-                                </div>
-                                <div className="flex flex-row gap-2">
-                                    <label>Y:</label>
-                                    <input
-                                        className="w-[10ch]"
-                                        type="number"
-                                        value={selectedPoint.y.toFixed(3)}
-                                        onChange={(e) =>
-                                            MovePoint(
-                                                selectedPointIndex,
-                                                { x: selectedPoint.x, y: Number(e.target.value) }
-                                            )}
-                                    ></input>
-                                </div>
+                                <input
+                                    className="colorSelect"
+                                    type="color"
+                                    value={shape.strokeColor}
+                                    onChange={(e) =>
+                                        updateSelectedShape(s => ({ ...s, strokeColor: e.target.value }))
+                                    }
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={shape.useStroke}
+                                    onChange={(e) =>
+                                        updateSelectedShape(s => ({ ...s, useStroke: e.target.checked }))
+                                    }
+                                />
                             </div>
-                        )
-                    }
+                        </div>
 
-                </div>
-                <div className="panel2">
-                    <h2>Shape</h2>
-                    <p>Shapes: {shapes.length}</p>
-                    <p>Selected shape:
-                        <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
-                    </p>
-                    <div className="flex flex-row gap-2">
-                        <p>Order:</p>
-                        <button onClick={moveForward}><i className="fa fa-arrow-up"></i></button>
-                        <button onClick={moveBackward}><i className="fa fa-arrow-down"></i></button>
-                    </div>
-                    <div className="flex flex-row gap-2">
-                        <p>Add/Remove shape:</p>
-                        <button title="Add shape" onClick={AddNewShape}><i className="fa fa-circle-plus"></i></button>
-                        <button title="Delete shape" onClick={DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
-                    </div>
-                </div>
-                <div className="panel2">
-
-
-                    <h2>Paths</h2>
-                    <p>Path:
-                        <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={shapes[selectedShapeIndex].paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
-                    </p>
-                    <div className="flex flex-row gap-2">
-                        <button title="Add path" onClick={AddNewPath}><i className="fa fa-circle-plus"></i></button>
-                        <button title="Delete path" onClick={DeleteSelectedPath}><i className="fa fa-circle-minus"></i></button>
-                    </div>
-                    {/* Line color */}
-                    <div className="flex flex-col">
-                        <label>Stroke</label>
-                        <div className="flex flex-row gap-2">
+                        {/* Fill color */}
+                        <div className="flex flex-col">
+                            <label>Fill</label>
+                            <div className="flex flex-row gap-2">
+                                <input
+                                    className="colorSelect"
+                                    type="color"
+                                    value={shape.fillColor}
+                                    onChange={(e) =>
+                                        updateSelectedShape(s => ({ ...s, fillColor: e.target.value }))
+                                    }
+                                />
+                                <input
+                                    type="checkbox"
+                                    checked={shape.useFill}
+                                    onChange={(e) =>
+                                        updateSelectedShape(s => ({ ...s, useFill: e.target.checked }))
+                                    }
+                                />
+                            </div>
+                        </div>
+                        {/* Line width */}
+                        <div className="flex flex-col">
+                            <label>Stroke width</label>
                             <input
-                                className="colorSelect"
-                                type="color"
-                                value={shape.strokeColor}
+                                type="range"
+                                value={shape.strokeWidth}
+                                min={1}
+                                max={128}
                                 onChange={(e) =>
-                                    updateSelectedShape(s => ({ ...s, strokeColor: e.target.value }))
+                                    updateSelectedShape(s => ({ ...s, strokeWidth: Number(e.target.value) }))
                                 }
                             />
+                        </div>
+
+                        {/* Toggle cyclic */}
+                        <div className="flex flex-row gap-2">
+                            <label>Closed shape</label>
                             <input
                                 type="checkbox"
-                                checked={shape.useStroke}
+                                checked={shape.cyclic}
                                 onChange={(e) =>
-                                    updateSelectedShape(s => ({ ...s, useStroke: e.target.checked }))
+                                    updateSelectedShape(s => ({ ...s, cyclic: e.target.checked }))
                                 }
                             />
                         </div>
                     </div>
 
-                    {/* Fill color */}
-                    <div className="flex flex-col">
-                        <label>Fill</label>
+                    <div className="panel2">
+
+                        <h2>Knobs</h2>
+                        {/* Knob size */}
                         <div className="flex flex-row gap-2">
-                            <input
-                                className="colorSelect"
-                                type="color"
-                                value={shape.fillColor}
-                                onChange={(e) =>
-                                    updateSelectedShape(s => ({ ...s, fillColor: e.target.value }))
-                                }
-                            />
-                            <input
-                                type="checkbox"
-                                checked={shape.useFill}
-                                onChange={(e) =>
-                                    updateSelectedShape(s => ({ ...s, useFill: e.target.checked }))
-                                }
-                            />
+                            <label>Show knobs</label>
+                            <input type="checkbox" checked={showKnobs} onChange={(e) => setShowKnobs(e.target.checked)} />
+                        </div>
+                        <div className="flex flex-col ">
+                            <label>Knob size</label>
+                            <input type="range" value={knobSize} min={8} max={64} onChange={handleKnobSize} />
+                        </div>
+
+                    </div>
+
+                    <div className="panel2">
+
+                        <h2>Grid</h2>
+                        {/* bg color */}
+                        <div className="flex flex-col ">
+                            <label>Background</label>
+                            <input className="colorSelect" type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+                        </div>
+                        {/* Toggle grid */}
+                        <div className="flex flex-row gap-2 ">
+                            <label>Show grid</label>
+                            <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
+                        </div>
+                        {/* Snap to grid */}
+                        <div className="flex flex-row gap-2 ">
+                            <label>Snap to grid</label>
+                            <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} />
+                        </div>
+                        {/* Grid subd */}
+                        <div className="flex flex-col ">
+                            <label>Grid subdivision</label>
+                            <input type="range" value={gridSubdivions} min={2} max={128} onChange={(e) => setGridSubdivisions(Number(e.target.value))} />
                         </div>
                     </div>
-                    {/* Line width */}
-                    <div className="flex flex-col">
-                        <label>Stroke width</label>
-                        <input
-                            type="range"
-                            value={shape.strokeWidth}
-                            min={1}
-                            max={128}
-                            onChange={(e) =>
-                                updateSelectedShape(s => ({ ...s, strokeWidth: Number(e.target.value) }))
-                            }
-                        />
-                    </div>
 
-                    {/* Toggle cyclic */}
-                    <div className="flex flex-row gap-2">
-                        <label>Closed shape</label>
-                        <input
-                            type="checkbox"
-                            checked={shape.cyclic}
-                            onChange={(e) =>
-                                updateSelectedShape(s => ({ ...s, cyclic: e.target.checked }))
-                            }
-                        />
-                    </div>
-                </div>
+                    <div className="panel2">
 
-                <div className="panel2">
+                        <h2>File</h2>
+                        {/* Export */}
+                        <div className="flex flex-row gap-2 ">
+                            <label>Filename:
+                            </label>
+                            <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)}></input>
+                        </div>
 
-                    <h2>Knobs</h2>
-                    {/* Knob size */}
-                    <div className="flex flex-row gap-2">
-                        <label>Show knobs</label>
-                        <input type="checkbox" checked={showKnobs} onChange={(e) => setShowKnobs(e.target.checked)} />
-                    </div>
-                    <div className="flex flex-col ">
-                        <label>Knob size</label>
-                        <input type="range" value={knobSize} min={8} max={64} onChange={handleKnobSize} />
-                    </div>
+                        <div className="flex flex-row gap-2  ">
+                            <select
+                                value={selectedExportScale}
+                                onChange={e => setSelectedExportScale(e.target.value)}
+                            >
+                                <option value={"0.1"}>0.1x</option>
+                                <option value={"0.25"}>0.25x</option>
+                                <option value={"0.5"}>0.5x</option>
+                                <option value={"1"}>1x</option>
+                                <option value={"2"}>2x</option>
+                                <option value={"4"}>4x</option>
+                            </select>
+                            <button title="Export/Download" onClick={ExportShape}><i className="fa-solid fa-download"></i></button>
 
-                </div>
-
-                <div className="panel2">
-
-                    <h2>Grid</h2>
-                    {/* bg color */}
-                    <div className="flex flex-col ">
-                        <label>Background</label>
-                        <input className="colorSelect" type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
-                    </div>
-                    {/* Toggle grid */}
-                    <div className="flex flex-row gap-2 ">
-                        <label>Show grid</label>
-                        <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
-                    </div>
-                    {/* Snap to grid */}
-                    <div className="flex flex-row gap-2 ">
-                        <label>Snap to grid</label>
-                        <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} />
-                    </div>
-                    {/* Grid subd */}
-                    <div className="flex flex-col ">
-                        <label>Grid subdivision</label>
-                        <input type="range" value={gridSubdivions} min={2} max={128} onChange={(e) => setGridSubdivisions(Number(e.target.value))} />
-                    </div>
-                </div>
-
-                <div className="panel2">
-
-                    <h2>File</h2>
-                    {/* Export */}
-                    <div className="flex flex-row gap-2 ">
-                        <label>Filename:
-                        </label>
-                        <input type="text" value={fileName} onChange={(e) => setFileName(e.target.value)}></input>
-                    </div>
-
-                    <div className="flex flex-row gap-2  ">
-                        <select
-                            value={selectedExportScale}
-                            onChange={e => setSelectedExportScale(e.target.value)}
-                        >
-                            <option value={"0.1"}>0.1x</option>
-                            <option value={"0.25"}>0.25x</option>
-                            <option value={"0.5"}>0.5x</option>
-                            <option value={"1"}>1x</option>
-                            <option value={"2"}>2x</option>
-                            <option value={"4"}>4x</option>
-                        </select>
-                        <button title="Export/Download" onClick={ExportShape}><i className="fa-solid fa-download"></i></button>
-
-                        <button title="Save" onClick={SaveShape}><i className="fa-solid fa-floppy-disk"></i></button>
-                        <button title="Load" onClick={LoadShape}><i className="fa-solid fa-folder"></i></button>
-                        <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
+                            <button title="Save" onClick={SaveShape}><i className="fa-solid fa-floppy-disk"></i></button>
+                            <button title="Load" onClick={LoadShape}><i className="fa-solid fa-folder"></i></button>
+                            <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
+                        </div>
                     </div>
                 </div>
             </div>
+
         </>
     )
 }

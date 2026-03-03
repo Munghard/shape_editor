@@ -4,8 +4,9 @@ DONE
 - [x] order shape in array (forward, backward)
 
 TODO
-- [ ] logic for adding points on last segment index (cyclic)
 - [ ] better ux for selecting shapes and paths, implement select and insert tools
+- [ ] open recent files
+- [ ] logic for adding points on last segment index (cyclic)
 - [ ] size of canvas
 - [ ] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool
 - [ ] display value of sliders
