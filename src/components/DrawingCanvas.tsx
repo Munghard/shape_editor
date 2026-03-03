@@ -151,14 +151,15 @@ export default function DrawingCanvas() {
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
         // we are hovering a valid segment
-        if (seg !== -1) {
+        if (seg !== -1 && tool === "Insert") {
             // draw a knob in the middle
             var start = shape.paths[selectedPathIndex].points[seg];
             var end = shape.paths[selectedPathIndex].points[seg + 1];
             var pos = lerpVec2(start, end, 0.5);
             ctx.beginPath();
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
-            ctx.fillStyle = "rgba(0, 255, 255, 0.3)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
             ctx.arc(pos.x, pos.y, threshold, Math.PI * 2, 0);
             ctx.fill();
             ctx.closePath();
@@ -192,11 +193,52 @@ export default function DrawingCanvas() {
     }
 
     function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
-        var co = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
-        ClearCanvas(co, canvasWidth, canvasHeight);
 
-        handleCreatePoint(e);
+        if (tool === "Select") {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
+
+            selectShapeAt(ctx, x, y);
+        }
+        else if (tool === "Insert") {
+            var co = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
+            ClearCanvas(co, canvasWidth, canvasHeight);
+            handleCreatePoint(e);
+        }
     }
+
+    function selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
+        setSelectedShapeIndex(0);
+
+        for (let i = shapes.length - 1; i >= 0; i--) {
+            buildPath(ctx, shapes[i]);
+            if (ctx.isPointInPath(x, y)) {
+                setSelectedShapeIndex(i);
+                break; // stop at first (topmost) hit
+            }
+        }
+    }
+
+    function buildPath(ctx: CanvasRenderingContext2D, shape: Shape) {
+        ctx.beginPath();
+        for (let index = 0; index < shape.paths.length; index++) {
+
+            const points = shape.paths[index].points;
+
+            if (!points || points.length === 0) continue;
+
+            ctx.moveTo(points[0].x, points[0].y);
+
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.closePath(); // optional for closed shapes
+        }
+    }
+
 
 
 
