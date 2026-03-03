@@ -18,7 +18,7 @@ export default function DrawingCanvas() {
 
     //SHAPE
     const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(0);
-    const [shapes, setShapes] = useState<Shape[]>([CreateDefaultShape()]);
+    const [shapes, setShapes] = useState<Shape[]>([]);
 
     const shape = shapes[selectedShapeIndex];
 
@@ -36,7 +36,7 @@ export default function DrawingCanvas() {
 
     // EDITOR
     const [selectedPathIndex, setSelectedPathIndex] = useState<number>(0);
-    const [selectedPointIndex, setSelectedPointIndex] = useState<number>(0);
+    const [selectedPointIndex, setSelectedPointIndex] = useState<number>(-1);
     const [selectedPoint, setSelectedPoint] = useState<Point | null>(null);
 
     const [tool, setTool] = useState<Tool>("Select");
@@ -206,7 +206,7 @@ export default function DrawingCanvas() {
         const y = e.clientY - rect.top;
         var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
 
-        if (tool === "Select") {
+        if (tool === "Select" || tool === "Move") {
             selectShapeAt(ctx, x, y);
         }
         else if (tool === "Insert") {
@@ -284,33 +284,55 @@ export default function DrawingCanvas() {
 
 
     function handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>) {
+        let shapeIndex = selectedShapeIndex;
+        let pathIndex = selectedPathIndex;
+        let _shape = shapes[shapeIndex];
+
+        // if no shape exists, create one
+        if (!_shape) {
+            const newShape = CreateDefaultShape();
+
+            setShapes(prev => {
+                const newShapes = [...prev, newShape];
+                // update selection immediately for next render
+                setSelectedShapeIndex(newShapes.length - 1);
+                setSelectedPathIndex(0);
+
+                // update local variables for this function
+                _shape = newShape;
+                shapeIndex = newShapes.length - 1;
+                pathIndex = 0;
+
+                return newShapes;
+            });
+        }
+
+        const path = _shape.paths[pathIndex];
+        if (!path) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
-
         let x = e.clientX - rect.left;
         let y = e.clientY - rect.top;
 
-        const path = shape.paths[selectedPathIndex];
+        let newPoint: Point;
+
         if (selectedSegment !== -1) {
             const n = path.points.length;
             const start = path.points[selectedSegment];
             const end = path.points[(selectedSegment + 1) % n];
 
             if (end) {
-                const pos = lerpVec2(start, end, 0.5);
-                insertPointAt(selectedSegment, pos.x, pos.y);
+                newPoint = lerpVec2(start, end, 0.5);
+                insertPointAt(selectedSegment, newPoint.x, newPoint.y);
                 setSelectedPointIndex(selectedSegment + 1);
                 startDragging(selectedSegment + 1);
             } else {
-                // last point: just append a new point
-                const newPoint = { x: start.x + 10, y: start.y }; // arbitrary direction
+                newPoint = { x: start.x + 10, y: start.y };
                 insertPointAt(path.points.length, newPoint.x, newPoint.y);
-                setSelectedPointIndex(path.points.length);
-                startDragging(path.points.length);
+                setSelectedPointIndex(path.points.length - 1);
+                startDragging(path.points.length - 1);
             }
-        }
-        else {
-            // CREATE POINT
+        } else {
             if (snapToGrid) {
                 const gridSizeX = canvasWidth / gridSubdivions;
                 const gridSizeY = canvasHeight / gridSubdivions;
@@ -318,34 +340,23 @@ export default function DrawingCanvas() {
                 x = Math.round(x / gridSizeX) * gridSizeX;
                 y = Math.round(y / gridSizeY) * gridSizeY;
             }
-            const newPoint = { x, y };
 
+            newPoint = { x, y };
             setShapes(prev =>
                 prev.map((s, i) => {
-                    if (i !== selectedShapeIndex) return s;
+                    if (i !== shapeIndex) return s;
 
                     const newPaths = [...s.paths];
-                    const currentPath = newPaths[selectedPathIndex];
+                    const currentPath = newPaths[pathIndex];
+                    const newPoints = [...currentPath.points, newPoint];
 
-                    const newPoints = [...currentPath.points];
-
-                    if (selectedPointIndex >= 0 && selectedPointIndex < newPoints.length) {
-                        newPoints.splice(selectedPointIndex, 0, newPoint);
-                    } else {
-                        newPoints.push(newPoint);
-                    }
-
-                    newPaths[selectedPathIndex] = {
-                        ...currentPath,
-                        points: newPoints
-                    }
+                    newPaths[pathIndex] = { ...currentPath, points: newPoints };
                     return { ...s, paths: newPaths };
                 })
             );
 
-
-            setSelectedPointIndex(selectedPointIndex);
-            startDragging(selectedPointIndex);
+            setSelectedPointIndex(path.points.length);
+            startDragging(path.points.length);
         }
     }
 
@@ -509,12 +520,16 @@ export default function DrawingCanvas() {
         }
     }
 
-    function AddNewShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
+    function handleClickAddShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
+        AddNewShape();
+    }
+    function AddNewShape(): Shape {
         const shape: Shape = CreateDefaultShape();
 
         setShapes(prev => [...prev, shape]);
         setSelectedShapeIndex(shapes.length);
         setSelectedPathIndex(0);
+        return shape;
     }
 
     function DeleteSelectedShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
@@ -530,8 +545,11 @@ export default function DrawingCanvas() {
         );
     }
 
-    function AddNewPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-
+    function handleClickAddNewPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
+        AddNewPath();
+    }
+    function AddNewPath(): void {
+        if (shapes.length < 1) return;
         setShapes(prev =>
             prev.map((s, i) => {
                 if (i !== selectedShapeIndex) return s;
@@ -683,7 +701,7 @@ export default function DrawingCanvas() {
                     </div>
                 </div>
                 {/* Controls */}
-                <div className="panel overflow-auto h-screen">
+                <div className="panel overflow-scroll h-screen">
                     {/* Selected point */}
                     {selectedPointIndex !== -1 &&
                         <div className="panel2">
@@ -730,7 +748,7 @@ export default function DrawingCanvas() {
                         <h2>Shape</h2>
                         <p>Shapes: {shapes.length}</p>
                         <div className="flex flex-row gap-2">
-                            <button title="Add shape" onClick={AddNewShape}><i className="fa fa-circle-plus"></i></button>
+                            <button title="Add shape" onClick={handleClickAddShape}><i className="fa fa-circle-plus"></i></button>
                         </div>
                         <p>Selected shape:
                             <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
@@ -756,7 +774,7 @@ export default function DrawingCanvas() {
                                 <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={shapes[selectedShapeIndex]?.paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
                             </p>
                             <div className="flex flex-row gap-2">
-                                <button title="Add path" onClick={AddNewPath}><i className="fa fa-circle-plus"></i></button>
+                                <button title="Add path" onClick={handleClickAddNewPath}><i className="fa fa-circle-plus"></i></button>
                                 <button title="Delete path" onClick={DeleteSelectedPath}><i className="fa fa-circle-minus"></i></button>
                             </div>
                             {/* Line color */}

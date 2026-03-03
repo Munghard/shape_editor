@@ -6,14 +6,14 @@ DONE
 - [x] logic for adding points on last segment index (cyclic)
 
 TODO
-- [ ] open recent files
 - [ ] size of canvas
-- [ ] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool
-- [ ] display value of sliders
 
 
 
 QOL
+- [ ] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool
+- [ ] open recent files
+- [ ] display value of sliders
 - [ ] light theme
 - [ ] collapsible panels
 - [ ] tool panel attach to left, other panel attach right
