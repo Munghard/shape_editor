@@ -1,3 +1,5 @@
+import type { Camera } from "./Camera";
+
 export type Shape = {
     paths: {
         points: Point[];
@@ -34,10 +36,17 @@ export function CreateDefaultShape(): Shape {
 
 }
 
-export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
+export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape, camera: Camera) {
     if (shape.paths.length === 0) return;
 
     ctx.beginPath();
+    ctx.setTransform(
+        camera.zoom,
+        0, 0,
+        camera.zoom,
+        -camera.x * camera.zoom,
+        -camera.y * camera.zoom
+    )
 
     shape.paths.forEach(path => {
         const points = path.points;
@@ -57,6 +66,8 @@ export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
     ctx.lineWidth = shape.strokeWidth;
     ctx.strokeStyle = shape.strokeColor;
     ctx.fillStyle = shape.fillColor;
+    ctx.lineJoin = "round"
+    ctx.lineCap = "round"
 
     if (shape.useFill) {
         ctx.fill("evenodd"); // THIS is where holes work

@@ -1,36 +1,53 @@
-export function ClearGrid(canvasWidth: number, canvasHeight: number) {
-    const canvas = document.getElementById("CanvasGrid") as HTMLCanvasElement;
-    canvas.getContext("2d")?.clearRect(0, 0, canvasWidth, canvasHeight);
+import type { Camera } from "./Camera";
+
+export function ClearGrid(ctx: CanvasRenderingContext2D) {
+    const canvasWidth = ctx.canvas.width;
+    const canvasHeight = ctx.canvas.height;
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 }
 
-export function DrawGrid(subdivision: number, canvasWidth: number, canvasHeight: number) {
-    var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
-    if (!c) return;
+export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, camera: Camera) {
+    const canvas = ctx.canvas;
+    const canvasWidth = canvas.width;
+    const canvasHeight = canvas.height;
 
-    var ctx = c.getContext("2d");
-    if (!ctx) return;
-
+    // reset transform and clear
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
     ctx.beginPath();
 
-    for (let x = 0; x < subdivision; x++) {
-        var step = canvasWidth / subdivision;
-        var xPos = x * step;
-        ctx.moveTo(xPos, 0);
-        ctx.lineTo(xPos, canvasHeight);
-        ctx.strokeStyle = "gray";
-        // ctx.strokeText(`${xPos.toFixed(1)}`, xPos + 2, 10);
+    // apply camera transform
+    ctx.setTransform(
+        camera.zoom,
+        0, 0,
+        camera.zoom,
+        -camera.x * camera.zoom,
+        -camera.y * camera.zoom
+    );
+
+    // define grid spacing in world units
+    const spacing = 1000 / subdivision; // e.g., 100 world units per grid line
+
+    // start lines at nearest multiple of spacing
+    const startX = Math.floor(camera.x / spacing) * spacing;
+    const startY = Math.floor(camera.y / spacing) * spacing;
+
+    // draw vertical lines
+    const endX = camera.x + canvasWidth / camera.zoom;
+    for (let x = startX; x <= endX; x += spacing) {
+        ctx.moveTo(x, camera.y);
+        ctx.lineTo(x, camera.y + canvasHeight / camera.zoom);
     }
 
-    for (let y = 0; y < subdivision; y++) {
-        var step = canvasHeight / subdivision;
-        var yPos = y * step;
-        ctx.moveTo(0, yPos);
-        ctx.lineTo(canvasWidth, yPos);
-        ctx.strokeStyle = "gray";
-        // ctx.strokeText(`${yPos.toFixed(1)}`, 2, yPos - 2);
-    };
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "black";
+    // draw horizontal lines
+    const endY = camera.y + canvasHeight / camera.zoom;
+    for (let y = startY; y <= endY; y += spacing) {
+        ctx.moveTo(camera.x, y);
+        ctx.lineTo(camera.x + canvasWidth / camera.zoom, y);
+    }
+
+    ctx.lineWidth = 1 / camera.zoom; // keep line width constant on zoom
+    ctx.strokeStyle = "gray";
     ctx.stroke();
 }

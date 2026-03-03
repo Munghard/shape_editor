@@ -9,8 +9,8 @@ DONE
 TODO
 - [ ] size of canvas
 - [ ] opacity to stroke and fill
-
-
+- [ ] infinite canvas
+- [ ]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
 
 QOL
 - [ ] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool

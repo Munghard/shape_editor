@@ -1,12 +1,12 @@
 import './App.css'
-import DrawingCanvas from './components/DrawingCanvas'
+import Main from './components/Main'
 
 function App() {
 
   return (
     <>
       <div>
-        <DrawingCanvas />
+        <Main />
       </div>
     </>
   )
