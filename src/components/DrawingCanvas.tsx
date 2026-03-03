@@ -214,6 +214,36 @@ export default function DrawingCanvas() {
             ClearCanvas(co, canvasWidth, canvasHeight);
             handleCreatePoint(e);
         }
+        // this is not needed here, its basically a distance based remove which is kinda unnecessary, deleting of points is handled trough clicking knobs
+        // else if (tool === "Delete") {
+        //     // remove clicked point >
+        //     // get selected shape
+        //     // get selected path
+        //     // get closest point in path and remove
+        //     // set shapes
+        //     const threshold = 20;
+
+        //     setShapes(prev =>
+        //         prev.map((s, si) => {
+        //             if (si !== selectedShapeIndex) return s;
+        //             const newPaths = s.paths.map((p, pi) => {
+        //                 if (pi !== selectedPathIndex) return p;
+
+        //                 const newPoints = shapes[selectedShapeIndex]
+        //                     .paths[selectedPathIndex]
+        //                     .points.filter(p => {
+        //                         const dx = p.x - x;
+        //                         const dy = p.y - y;
+        //                         return Math.sqrt(dx * dx + dy * dy) > threshold;
+        //                     });
+        //                 return { ...p, points: newPoints };
+        //             })
+        //             return { ...s, paths: newPaths };
+        //         })
+        //     )
+
+        // }
+
         if (selectedShapeIndex !== -1) { // this doesnt work because selectedshapeindex is never -1 so drag is always set on click
 
             dragOffset.current = { x, y };
@@ -614,7 +644,7 @@ export default function DrawingCanvas() {
                     <div className="flex flex-col gap-2">
                         <h2>Tools</h2>
                         <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select"><i className="fa-solid fa-arrow-pointer"></i></button>
-                        <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert"><i className="fa-regular fa-hand-point-left"></i></button>
+                        <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert"><i className="fa-solid fa-pencil"></i></button>
                         <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
                         <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete"><i className="fa-solid fa-eraser"></i></button>
                     </div>
@@ -645,7 +675,7 @@ export default function DrawingCanvas() {
                                     return (
                                         <div
                                             key={i}
-                                            onMouseDown={() => { startDragging(i); setSelectedPointIndex(i); }}
+                                            onMouseDown={() => { if (tool === "Delete") { handleRemovePoint(i) }; startDragging(i); setSelectedPointIndex(i); }}
                                             style={{
                                                 top: y,
                                                 left: x,
@@ -661,6 +691,7 @@ export default function DrawingCanvas() {
                                 border-2 
                                 border-white/50
                                 hover:border-white
+                                ${tool === "Delete" ? "cursor-crosshair" : "cursor-pointer"}
                                 `
                                             }></div>
                                     )
