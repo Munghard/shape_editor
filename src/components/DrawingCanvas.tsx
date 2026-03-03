@@ -702,7 +702,7 @@ export default function DrawingCanvas() {
                 </div>
                 <div id="middle_column" className="flex flex-col gap-2 justify-around ">
                     <div className='top-0 fixed'>
-                        <h1 className='mb-10 text-zinc-400'>Shape editor</h1>
+                        <h1 className='mb-10 text-zinc-400 flex text-center'>LIGMA</h1>
                     </div>
                     {/* Knobs */}
                     <div className="flex flex-col gap-4">
