@@ -35,6 +35,10 @@ export default function DrawingCanvas() {
     const [snapToGrid, setSnapToGrid] = useState<boolean>(false);
 
     // EDITOR
+    const MAX_RECENT = 5;
+    const RECENTFILESKEY = "recentFiles";
+    const [recentFiles, setRecentFiles] = useState<SaveData[]>([]);
+
     const [selectedPathIndex, setSelectedPathIndex] = useState<number>(0);
     const [selectedPointIndex, setSelectedPointIndex] = useState<number>(-1);
     const [selectedPoint, setSelectedPoint] = useState<Point | null>(null);
@@ -49,6 +53,15 @@ export default function DrawingCanvas() {
     const [dragging, setDragging] = useState<boolean>(false);
     const dragOffset = useRef({ x: 0, y: 0 });
 
+
+    useEffect(() => {
+        const stored = localStorage.getItem(RECENTFILESKEY);
+        let filesAsStrings: string[] = stored ? JSON.parse(stored) : [];
+
+        let files: SaveData[] = filesAsStrings.map(f => JSON.parse(f));
+        setRecentFiles(files);
+        console.log(files);
+    }, [shape]);
 
     useEffect(() => {
         if (!shape) {
@@ -495,6 +508,7 @@ export default function DrawingCanvas() {
 
     function SaveShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         const saveData: SaveData = {
+            id: crypto.randomUUID(),
             fileName,
             shapes,
             useGrid: showGrid,
@@ -504,6 +518,7 @@ export default function DrawingCanvas() {
         const json = JSON.stringify(saveData);
         const blob = new Blob([json], { type: "application/json" });
         const url = URL.createObjectURL(blob);
+        AddToRecentFiles(json);
 
         const link = document.createElement("a");
         link.href = url;
@@ -542,12 +557,23 @@ export default function DrawingCanvas() {
                     setSnapToGrid(loadData.snapGrid);
                     setGridSubdivisions(loadData.gridSubd);
 
+                    AddToRecentFiles(text);
                 } catch (error) {
                     console.log("failed to load file.")
                 }
             };
             reader.readAsText(file);
         }
+    }
+
+
+    function AddToRecentFiles(data: string) {
+        const stored = localStorage.getItem(RECENTFILESKEY);
+        let files: string[] = stored ? JSON.parse(stored) : [];
+        files = files.filter(f => f !== data);
+        files.unshift(data);
+        if (files.length > MAX_RECENT) files.slice(0, MAX_RECENT);
+        localStorage.setItem(RECENTFILESKEY, JSON.stringify(files));
     }
 
     function handleClickAddShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
@@ -635,6 +661,31 @@ export default function DrawingCanvas() {
         });
     }
 
+
+    function RemoveFromLocalStorage(id: string) {
+        // document. alert if you want to delete
+        const stored = localStorage.getItem(RECENTFILESKEY);
+        if (!stored) return;
+
+        try {
+            const filesAsStrings: string[] = JSON.parse(stored);
+
+            // Remove matching file
+            const filtered = filesAsStrings.filter(str => {
+                const file: SaveData = JSON.parse(str);
+                return file.id !== id;
+            });
+
+            localStorage.setItem(RECENTFILESKEY, JSON.stringify(filtered));
+
+            // Update state (important so UI refreshes)
+            const parsedFiles: SaveData[] = filtered.map(f => JSON.parse(f));
+            setRecentFiles(parsedFiles);
+
+        } catch (e) {
+            console.error("Failed removing recent file", e);
+        }
+    }
 
     return (
         <>
@@ -947,6 +998,14 @@ export default function DrawingCanvas() {
                             <button title="Save" onClick={SaveShape}><i className="fa-solid fa-floppy-disk"></i></button>
                             <button title="Load" onClick={LoadShape}><i className="fa-solid fa-folder"></i></button>
                             <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            {recentFiles.map((file, index) =>
+                                <div className="flex flex-row gap-2" key={index}>
+                                    <button onClick={() => { setShapes(file.shapes); setFileName(file.fileName) }} >{file.fileName}</button>
+                                    <button onClick={() => { RemoveFromLocalStorage(file.id) }} ><i className="fa-solid fa-x"></i></button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

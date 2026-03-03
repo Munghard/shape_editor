@@ -1,6 +1,7 @@
 import type { Shape } from "./Shape"
 
 export type SaveData = {
+    id: string;
     fileName: string;
     shapes: Shape[];
 
