@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { ClearCanvas, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
+import { ClearCanvas, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
 import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
 import getHoveredSegment from "./Segment";
@@ -139,6 +139,10 @@ export default function Main() {
     useEffect(() => {
         function handleKeyDown(e: globalThis.KeyboardEvent) {
             if (e.repeat) return;
+            const active = document.activeElement;
+            if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) {
+                return; // skip hotkeys while typing
+            }
 
             const key = e.key.toLowerCase();
 
@@ -291,10 +295,11 @@ export default function Main() {
     function handleMouseMove(e: React.DragEvent<HTMLCanvasElement>) {
 
         if (!canvasRef.current) return;
-        const rect = canvasRef.current.getBoundingClientRect();
 
-        let screenX = e.clientX - rect.left;
-        let screenY = e.clientY - rect.top;
+        var cmp = getCanvasMousePos(e, canvasRef.current)
+
+        let screenX = cmp.x;
+        let screenY = cmp.y;
 
         if (tool === "Rotate" && dragging && lastMouseRef.current) {
 
@@ -422,7 +427,7 @@ export default function Main() {
                 const end = path.points[(seg + 1) % n]; // loops back to first point if last
 
                 var pos = lerpVec2(start, end, 0.5);
-                const { x, y } = worldToScreen(pos.x, pos.y, cameraRef.current);
+                const { x, y } = worldToScreen(pos.x, pos.y, cameraRef.current, canvasRef.current);
                 ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                 ctx.beginPath();
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
@@ -443,7 +448,7 @@ export default function Main() {
         if (tool === "Delete") {
             handleRemovePoint(i)
         };
-        if (tool === "Select" || tool === "Move") {
+        if (tool === "Select" || tool === "Move" || tool === "Insert") {
             startDragging(i);
             setSelectedPointIndex(i);
         }
@@ -459,9 +464,12 @@ export default function Main() {
 
     }
     function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const screenX = e.clientX - rect.left;
-        const screenY = e.clientY - rect.top;
+        if (!canvasRef.current) return;
+
+        var cmp = getCanvasMousePos(e, canvasRef.current)
+
+        const screenX = cmp.x;
+        const screenY = cmp.y;
         var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
 
         if (tool === "Pan" || tool === "Scale" || tool === "Rotate") {
@@ -571,6 +579,7 @@ export default function Main() {
     }
 
     function handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>) {
+        if (!canvasRef.current) return;
         let shapeIndex = selectedShapeIndex;
         let pathIndex = selectedPathIndex;
         let _shape = history.present.shapes[shapeIndex];
@@ -598,11 +607,12 @@ export default function Main() {
         const path = _shape.paths[pathIndex];
         if (!path) return;
 
-        const rect = e.currentTarget.getBoundingClientRect();
         const cam = cameraRef.current;
 
-        const canvasX = e.clientX - rect.left;
-        const canvasY = e.clientY - rect.top;
+        var cmp = getCanvasMousePos(e, canvasRef.current)
+
+        const canvasX = cmp.x;
+        const canvasY = cmp.y;
 
         let x = canvasX / cam.zoom + cam.x;
         let y = canvasY / cam.zoom + cam.y;
@@ -700,7 +710,6 @@ export default function Main() {
     function startDragging(index: number) {
         if (!canvasRef.current) return;
 
-        const canvas = canvasRef.current;
         const shape = history.present.shapes[selectedShapeIndex];
         const path = shape.paths[selectedPathIndex];
         const startPoint = path.points[index];
@@ -709,12 +718,13 @@ export default function Main() {
         let offsetY = 0;
 
         function onMouseMove(e: MouseEvent) {
-            const rect = canvas.getBoundingClientRect();
+            if (!canvasRef.current) return;
             const camera = cameraRef.current;
 
+            var cmp = getCanvasMousePos(e, canvasRef.current)
             // convert mouse to world coordinates
-            let mouseWorldX = (e.clientX - rect.left) / camera.zoom + camera.x;
-            let mouseWorldY = (e.clientY - rect.top) / camera.zoom + camera.y;
+            let mouseWorldX = (cmp.x) / camera.zoom + camera.x;
+            let mouseWorldY = (cmp.y) / camera.zoom + camera.y;
 
             if (offsetX === 0 && offsetY === 0) {
                 offsetX = startPoint.x - mouseWorldX;
@@ -747,9 +757,10 @@ export default function Main() {
     function handleScroll(e: React.WheelEvent): void {
         if (!canvasRef.current) return;
 
-        const rect = canvasRef.current.getBoundingClientRect();
-        const canvasX = e.clientX - rect.left;
-        const canvasY = e.clientY - rect.top;
+        var cmp = getCanvasMousePos(e, canvasRef.current)
+
+        const canvasX = cmp.x;
+        const canvasY = cmp.y;
 
         const cam = cameraRef.current;
 
@@ -1021,16 +1032,18 @@ export default function Main() {
                                     var bgHoverColor =
                                         selected ? 'hover:bg-zinc-100/90' :
                                             'hover:bg-zinc-100/50'
+                                    if (!canvasRef.current) return;
 
-                                    const x = (p.x - cameraRef.current.x) * cameraRef.current.zoom - (_knobSize * 0.5);
-                                    const y = (p.y - cameraRef.current.y) * cameraRef.current.zoom - (_knobSize * 0.5);
+                                    const { x, y } = worldToScreen(p.x, p.y, cameraRef.current, canvasRef.current);
+                                    const knobX = x - (_knobSize * 0.5);
+                                    const knobY = y - (_knobSize * 0.5);
                                     return (
                                         <div
                                             key={i}
                                             onMouseDown={(e) => handleKnobMouseDown(e, i)}
                                             style={{
-                                                top: y,
-                                                left: x,
+                                                top: knobY,
+                                                left: knobX,
                                                 width: _knobSize,
                                                 height: _knobSize
                                             }}

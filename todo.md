@@ -11,13 +11,15 @@ DONE
 - [x] tool panel attach to left, other panel attach right
 - [x] display value of sliders
 - [x] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool
+- [x] scale shape tool
+- [x] rotate shape tool
+- [x] add shapes to a panel where you can select them
+- [x] snap to grid is now broken, different grid drawing in drawgrid
 
 TODO
+- [ ] make some kind of frame for exporting, can be in the file panel just a x,y value that you set and then theres an overlay on canvas
+- [ ] session save
 - [ ] center camera button
-- [ ] scale shape tool
-- [ ] rotate shape tool
-- [ ] add shapes to a panel where you can select them
-- [ ] snap to grid is now broken, different grid drawing in drawgrid
 - [ ] Multi shape select
 - [ ] opacity to stroke and fill
 - [ ]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)

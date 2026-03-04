@@ -24,10 +24,17 @@ export function screenToWorld(mouseX: number, mouseY: number, camera: Camera) {
         y: mouseY / camera.zoom + camera.y
     }
 }
-export function worldToScreen(worldX: number, worldY: number, camera: Camera) {
+export function worldToScreen(worldX: number, worldY: number, camera: Camera, canvas: HTMLCanvasElement) {
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+
+    const scaleX = rect.width / canvas.width;
+    const scaleY = rect.height / canvas.height;
+
     return {
-        x: (worldX - camera.x) * camera.zoom,
-        y: (worldY - camera.y) * camera.zoom
+        x: (worldX - camera.x) * camera.zoom * scaleX,
+        y: (worldY - camera.y) * camera.zoom * scaleY
     };
 }
 export function shapesEqual(a: Shape[], b: Shape[]) {
@@ -71,5 +78,12 @@ export function getShapeCenter(shape: Shape) {
     return {
         x: (minX + maxX) / 2,
         y: (minY + maxY) / 2
+    };
+}
+export function getCanvasMousePos(e: MouseEvent | React.MouseEvent, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+        y: ((e.clientY - rect.top) / rect.height) * canvas.height
     };
 }
