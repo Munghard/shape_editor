@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react"
 import { ClearCanvas, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
-import { DrawShape, type Shape, type Point, CreateBaseShape, type Path, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
+import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
 import getHoveredSegment from "./Segment";
 import { type SaveData } from "./SaveData";
 import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
