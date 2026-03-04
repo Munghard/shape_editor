@@ -154,6 +154,10 @@ export default function Main() {
                 redo();
                 e.preventDefault();
             }
+            if (e.key === "q") {
+                setTool("Select");
+                e.preventDefault();
+            }
             if (e.key === "s") {
                 setTool("Scale");
                 e.preventDefault();
@@ -974,13 +978,13 @@ export default function Main() {
                 <div id="TOOLS" className="panel  overflow-auto h-screen">
                     <div className="flex flex-col gap-2">
                         <h2>Tools</h2>
-                        <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select"><i className="fa-solid fa-arrow-pointer"></i></button>
-                        <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert"><i className="fa-solid fa-pencil"></i></button>
-                        <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
-                        <button className={`${tool === "Rotate" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Rotate")} title="Rotate"><i className="fa-solid fa-rotate"></i></button>
-                        <button className={`${tool === "Scale" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Scale")} title="Scale"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-                        <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete"><i className="fa-solid fa-eraser"></i></button>
-                        <button className={`${tool === "Pan" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Pan")} title="Pan"><i className="fa-solid fa-hand"></i></button>
+                        <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
+                        <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert(Shift)"><i className="fa-solid fa-pencil"></i></button>
+                        <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move(Ctrl)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                        <button className={`${tool === "Rotate" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
+                        <button className={`${tool === "Scale" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+                        <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete(Alt)"><i className="fa-solid fa-eraser"></i></button>
+                        <button className={`${tool === "Pan" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
                     </div>
                 </div>
                 {/* shaped and paths */}
