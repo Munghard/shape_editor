@@ -47,7 +47,7 @@ export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, sn
 
 export function LoadFile(
     setFileName: (fileName: string) => void,
-    setShapes: (shapes: Shape[]) => void,
+    commit: (updater: (shapes: Shape[]) => Shape[]) => void,
     setShowGrid: (showGrid: boolean) => void,
     setSnapToGrid: (snapToGrid: boolean) => void,
     setGridSubdivisions: (gridsubd: number) => void,
@@ -74,7 +74,7 @@ export function LoadFile(
 
                 // Apply loaded data to state
                 setFileName(loadData.fileName);
-                setShapes(loadData.shapes);
+                commit(() => loadData.shapes);
                 setShowGrid(loadData.useGrid);
                 setSnapToGrid(loadData.snapGrid);
                 setGridSubdivisions(loadData.gridSubd);
@@ -96,4 +96,29 @@ export function AddToRecentFiles(data: string) {
     files.unshift(data);
     if (files.length > MAX_RECENT) files.slice(0, MAX_RECENT);
     localStorage.setItem(RECENTFILESKEY, JSON.stringify(files));
+}
+
+export function RemoveFromLocalStorage(id: string, setRecentFiles: (files: SaveData[]) => void) {
+    // document. alert if you want to delete
+    const stored = localStorage.getItem(RECENTFILESKEY);
+    if (!stored) return;
+
+    try {
+        const filesAsStrings: string[] = JSON.parse(stored);
+
+        // Remove matching file
+        const filtered = filesAsStrings.filter(str => {
+            const file: SaveData = JSON.parse(str);
+            return file.id !== id;
+        });
+
+        localStorage.setItem(RECENTFILESKEY, JSON.stringify(filtered));
+
+        // Update state (important so UI refreshes)
+        const parsedFiles: SaveData[] = filtered.map(f => JSON.parse(f));
+        setRecentFiles(parsedFiles);
+
+    } catch (e) {
+        console.error("Failed removing recent file", e);
+    }
 }

@@ -11,6 +11,9 @@ DONE
 - [x] tool panel attach to left, other panel attach right
 
 TODO
+- [ ] scale shape tool
+- [ ] rotate shape tool
+- [ ] add shapes to a panel where you can select them
 - [ ] snap to grid is now broken, different grid drawing in drawgrid
 - [ ] Multi shape select
 - [ ] opacity to stroke and fill

@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, type KeyboardEvent } from "react"
-import { ClearCanvas, lerpVec2, screenToWorld, worldToScreen } from "../Utilities/Utilities";
+import React, { useEffect, useRef, useState } from "react"
+import { ClearCanvas, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
-import { CreateDefaultShape, DrawShape, type Shape, type Point } from "./Shape";
+import { DrawShape, type Shape, type Point, CreateBaseShape, type Path, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
 import getHoveredSegment from "./Segment";
 import { type SaveData } from "./SaveData";
-import { ExportShape, LoadFile, SaveFile } from "./File";
+import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
+import type { History } from "./History";
 
 type Tool = "Select" | "Move" | "Insert" | "Delete" | "Pan";
 
@@ -12,7 +13,16 @@ export const MAX_RECENT = 5;
 export const RECENTFILESKEY = "recentFiles";
 
 export default function Main() {
-    // File
+
+
+    // HISTORY
+    const [history, setHistory] = useState<History>({
+        past: [],
+        present: { shapes: [] },
+        future: []
+    });
+
+    // FILE
     const [fileName, setFileName] = useState<string>("Image");
 
     // CANVAS
@@ -21,9 +31,8 @@ export default function Main() {
 
     //SHAPE
     const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(0);
-    const [shapes, setShapes] = useState<Shape[]>([]);
 
-    const shape = shapes[selectedShapeIndex];
+    const shape = history.present.shapes[selectedShapeIndex];
 
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
@@ -57,8 +66,7 @@ export default function Main() {
     const [tool, setTool] = useState<Tool>("Select");
 
     const [selectedExportScale, setSelectedExportScale] = useState<string>("1");
-    const canvasWidth = 512 * 1;
-    const canvasHeight = 512 * 1;
+
 
     // DRAG
     const [dragging, setDragging] = useState<boolean>(false);
@@ -74,20 +82,7 @@ export default function Main() {
         // console.log(files);
     }, [shape]);
 
-    // SELECTED POINT
-    useEffect(() => {
-        if (!shape) {
-            setSelectedPoint(null);
-            return;
-        }
 
-        const points = shape.paths[selectedPathIndex]?.points;
-        if (!points || selectedPointIndex === null || selectedPointIndex < 0 || selectedPointIndex >= points.length) {
-            setSelectedPoint(null);
-        } else {
-            setSelectedPoint(points[selectedPointIndex]);
-        }
-    }, [shape, selectedPathIndex, selectedPointIndex]);
 
     // DRAW
     useEffect(() => {
@@ -96,7 +91,7 @@ export default function Main() {
         const rect = canvas.getBoundingClientRect();
         setCanvasRect(rect);
 
-    }, [shapes, knobSize]);
+    }, [history.present.shapes, knobSize]);
 
     function Draw() {
 
@@ -106,7 +101,7 @@ export default function Main() {
         const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 
         ClearCanvas(ctx);
-        shapes.forEach(shape => DrawShape(ctx, shape, cameraRef.current));
+        history.present.shapes.forEach(shape => DrawShape(ctx, shape, cameraRef.current));
     }
 
     // DRAW GRID
@@ -121,48 +116,74 @@ export default function Main() {
         }
     }, [showGrid, gridSubdivions]);
 
-    // SET SELECTED POINT
+
+    // SELECTED POINT
     useEffect(() => {
-        if (shape && selectedPointIndex != null && shape.paths[selectedPathIndex].points[selectedPointIndex]) {
-            setSelectedPoint(shape.paths[selectedPathIndex].points[selectedPointIndex]);
-        } else {
+        if (!shape) {
             setSelectedPoint(null);
+            return;
         }
-    }, [selectedPointIndex, shape]);
+        const points = shape.paths[selectedPathIndex]?.points;
+        if (!points || selectedPointIndex === null || selectedPointIndex < 0 || selectedPointIndex >= points.length) {
+            setSelectedPoint(null);
+        } else {
+            setSelectedPoint(points[selectedPointIndex]);
+        }
+    }, [shape, selectedPathIndex, selectedPointIndex]);
+
+
 
     // HOTKEYS
     useEffect(() => {
         function handleKeyDown(e: globalThis.KeyboardEvent) {
             if (e.repeat) return;
+
+            const key = e.key.toLowerCase();
+
+            if (e.ctrlKey && !e.shiftKey && key === "z") {
+                undo();
+                e.preventDefault();
+            }
+            if (e.ctrlKey && e.shiftKey && key === "z") {
+                redo();
+                e.preventDefault();
+            }
             if (e.key === "Control") {
                 setTool("Move");
+                e.preventDefault();
             }
             if (e.code === "Space") {
                 setTool("Pan");
+                e.preventDefault();
             }
             if (e.key === "Shift") {
                 setTool("Insert");
+                e.preventDefault();
             }
             if (e.key === "Alt") {
                 setTool("Delete");
+                e.preventDefault();
             }
-            e.preventDefault();
+
         }
 
         function handleKeyUp(e: globalThis.KeyboardEvent): void {
             if (e.key === "Control") {
                 setTool("Select");
+                e.preventDefault();
             }
             if (e.code === "Space") {
                 setTool("Select");
+                e.preventDefault();
             }
             if (e.key === "Shift") {
                 setTool("Select");
+                e.preventDefault();
             }
             if (e.key === "Alt") {
                 setTool("Select");
+                e.preventDefault();
             }
-            e.preventDefault();
         }
 
         window.addEventListener("keydown", handleKeyDown);
@@ -179,6 +200,13 @@ export default function Main() {
         window.addEventListener("resize", resizeCanvases);
         return () => window.removeEventListener("resize", resizeCanvases);
     }, []);
+    useEffect(() => {
+
+        if (canvasRef.current) {
+            cameraRef.current.x = -canvasRef.current.width / 2;
+            cameraRef.current.y = -canvasRef.current.height / 2;
+        }
+    }, [canvasRef.current]);
 
     function ReDrawGrid() {
         var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
@@ -215,23 +243,27 @@ export default function Main() {
         Draw(); // redraw after resizing
         if (showGrid) ReDrawGrid();
     }
+    function changeDetected(): boolean {
+        const current = history.present.shapes;
+        const lastPast = history.past[history.past.length - 1]?.shapes;
+
+        return !shapesEqual(current, lastPast);
+    }
 
     function handleRemovePoint(index: number) {
-        setShapes(prev =>
-            prev.map((s, i) => {
+
+        commit(prevShapes =>
+            prevShapes.map((s, i) => {
                 if (i !== selectedShapeIndex) return s;
 
                 const newPaths = [...s.paths];
-                const currentPath = newPaths[selectedPathIndex];
+                const currentPath = { ...newPaths[selectedPathIndex] };
 
-                const newPoints = currentPath.points.filter(
+                currentPath.points = currentPath.points.filter(
                     (_p, idx) => idx !== index
                 );
 
-                newPaths[selectedPathIndex] = {
-                    ...currentPath,
-                    points: newPoints
-                };
+                newPaths[selectedPathIndex] = currentPath;
 
                 return { ...s, paths: newPaths };
             })
@@ -278,19 +310,21 @@ export default function Main() {
                 const dx = (screenX - dragOffset.current.x) / cameraRef.current.zoom;
                 const dy = (screenY - dragOffset.current.y) / cameraRef.current.zoom;
 
-                setShapes(prev => {
-                    const copy = [...prev];
-                    const shape = copy[selectedShapeIndex];
+                setHistory(prev => {
+                    const copy = [...prev.present.shapes];
+                    const shape = { ...copy[selectedShapeIndex] };
+                    shape.paths = shape.paths.map(path => ({
+                        ...path,
+                        points: path.points.map(pt => ({ x: pt.x + dx, y: pt.y + dy }))
+                    }));
+                    copy[selectedShapeIndex] = shape;
 
-                    shape.paths.forEach(path =>
-                        path.points.forEach(pt => {
-                            pt.x += dx / 2;
-                            pt.y += dy / 2;
-                        })
-                    );
-
-                    return copy;
+                    return {
+                        ...prev,
+                        present: { shapes: copy },
+                    };
                 });
+
                 dragOffset.current = { x: screenX, y: screenY };
                 Draw();
                 ReDrawGrid();
@@ -311,7 +345,7 @@ export default function Main() {
             const ctx = canvas.getContext("2d");
             if (!ctx) return;
 
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // we are hovering a valid segment
             if (seg !== -1) {
@@ -335,6 +369,29 @@ export default function Main() {
         }
     }
 
+    function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, i: number) {
+        const knob = e.currentTarget as HTMLDivElement;
+        knob.style.pointerEvents = "none";
+        knob.style.display = "none";
+
+        if (tool === "Delete") {
+            handleRemovePoint(i)
+        };
+        if (tool === "Select" || tool === "Move") {
+            startDragging(i);
+            setSelectedPointIndex(i);
+        }
+
+        function onMouseUp() {
+            knob.style.pointerEvents = "auto"; // re-enable after drag
+            knob.style.display = "flex";
+            window.removeEventListener("mouseup", onMouseUp);
+        }
+
+        window.addEventListener("mouseup", onMouseUp);
+
+
+    }
     function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
         const rect = e.currentTarget.getBoundingClientRect();
         const screenX = e.clientX - rect.left;
@@ -362,6 +419,12 @@ export default function Main() {
     }
     function handleMouseUp(_e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
         setDragging(false);
+
+
+        if (changeDetected()) {
+
+            commit(() => history.present.shapes);
+        }
     }
 
     function selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
@@ -372,8 +435,8 @@ export default function Main() {
         setSelectedPathIndex(-1);
         setSelectedPointIndex(-1);
 
-        for (let i = shapes.length - 1; i >= 0; i--) {
-            buildPath(ctx, shapes[i]);
+        for (let i = history.present.shapes.length - 1; i >= 0; i--) {
+            buildPath(ctx, history.present.shapes[i]);
 
             if (ctx.isPointInPath(x, y)) {
 
@@ -383,7 +446,7 @@ export default function Main() {
 
                 if (i === prevShape) {
                     // cycle to next path
-                    const pathCount = shapes[i].paths.length;
+                    const pathCount = history.present.shapes[i].paths.length;
                     nextPathIndex = (prevPath + 1) % pathCount;
                 }
 
@@ -413,40 +476,44 @@ export default function Main() {
 
     function MovePoint(pointIndex: number, newPoint: Point) {
 
-        setShapes(prev =>
-            prev.map((s, i) => {
-                if (i !== selectedShapeIndex) return s;
+        if (changeDetected()) {
 
-                const newPaths = [...s.paths];
-                const currentPath = newPaths[selectedPathIndex];
 
-                const newPoints = currentPath.points.map((p, j) =>
-                    j === pointIndex ? { x: newPoint.x, y: newPoint.y } : p
-                );
+            commit(prevShapes =>
+                prevShapes.map((shape, i) => {
+                    if (i !== selectedShapeIndex) return shape;
 
-                newPaths[selectedPathIndex] = {
-                    ...currentPath,
-                    points: newPoints
-                };
+                    // copy all paths
+                    const newPaths = shape.paths.map((path, pi) => {
+                        if (pi !== selectedPathIndex) return path;
 
-                return { ...s, paths: newPaths };
-            })
-        );
+                        // copy points, replacing the moved point
+                        const newPoints = path.points.map((pt, pj) =>
+                            pj === pointIndex ? { x: newPoint.x, y: newPoint.y } : { ...pt }
+                        );
+
+                        return { ...path, points: newPoints };
+                    });
+
+                    return { ...shape, paths: newPaths };
+                })
+            );
+        }
 
         setSelectedPointIndex(pointIndex);
     }
 
-
     function handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>) {
         let shapeIndex = selectedShapeIndex;
         let pathIndex = selectedPathIndex;
-        let _shape = shapes[shapeIndex];
+        let _shape = history.present.shapes[shapeIndex];
 
         // if no shape exists, create one
         if (!_shape) {
-            const newShape = CreateDefaultShape();
+            const newShape = CreateBaseShape();
 
-            setShapes(prev => {
+
+            commit(prev => {
                 const newShapes = [...prev, newShape];
                 // update selection immediately for next render
                 setSelectedShapeIndex(newShapes.length - 1);
@@ -488,15 +555,18 @@ export default function Main() {
             }
         } else {
             if (snapToGrid) {
-                const gridSizeX = canvasWidth / gridSubdivions;
-                const gridSizeY = canvasHeight / gridSubdivions;
+                if (!canvasRef.current) return;
+                const gridSizeX = canvasRef.current.width / gridSubdivions;
+                const gridSizeY = canvasRef.current.height / gridSubdivions;
 
-                x = Math.round(x / gridSizeX) * gridSizeX;
-                y = Math.round(y / gridSizeY) * gridSizeY;
+                x = Math.round(x / gridSizeX) * 1000 / gridSubdivions;
+                y = Math.round(y / gridSizeY) * 1000 / gridSubdivions;
             }
 
             newPoint = { x, y };
-            setShapes(prev =>
+
+
+            commit(prev =>
                 prev.map((s, i) => {
                     if (i !== shapeIndex) return s;
 
@@ -517,7 +587,8 @@ export default function Main() {
     function insertPointAt(index: number, x: number, y: number) {
         const newPoint = { x, y };
 
-        setShapes(prev =>
+
+        commit(prev =>
             prev.map((s, i) => {
                 if (i !== selectedShapeIndex) return s;
 
@@ -555,21 +626,41 @@ export default function Main() {
     }
 
     function startDragging(index: number) {
+        if (!canvasRef.current) return;
+
+        const canvas = canvasRef.current;
+        const shape = history.present.shapes[selectedShapeIndex];
+        const path = shape.paths[selectedPathIndex];
+        const startPoint = path.points[index];
+
+        let offsetX = 0;
+        let offsetY = 0;
 
         function onMouseMove(e: MouseEvent) {
-            const rect = canvasRef.current!.getBoundingClientRect();
+            const rect = canvas.getBoundingClientRect();
+            const camera = cameraRef.current;
 
-            let x = e.clientX - rect.left;
-            let y = e.clientY - rect.top;
+            // convert mouse to world coordinates
+            let mouseWorldX = (e.clientX - rect.left) / camera.zoom + camera.x;
+            let mouseWorldY = (e.clientY - rect.top) / camera.zoom + camera.y;
+
+            if (offsetX === 0 && offsetY === 0) {
+                offsetX = startPoint.x - mouseWorldX;
+                offsetY = startPoint.y - mouseWorldY;
+            }
+
+            let x = mouseWorldX + offsetX;
+            let y = mouseWorldY + offsetY;
 
             if (snapToGrid) {
-                const gridSizeX = canvasWidth / gridSubdivions;
-                const gridSizeY = canvasHeight / gridSubdivions;
-
-                x = Math.round(x / gridSizeX) * gridSizeX;
-                y = Math.round(y / gridSizeY) * gridSizeY;
+                const spacing = 1000 / gridSubdivions; // same as DrawGrid
+                x = Math.round(x / spacing) * spacing;
+                y = Math.round(y / spacing) * spacing;
             }
-            MovePoint(index, { x, y });
+
+            path.points[index] = { x, y };
+            Draw();
+            ReDrawGrid();
         }
 
         function onMouseUp() {
@@ -601,36 +692,51 @@ export default function Main() {
         const ctx = tempCanvas.getContext("2d");
         if (!ctx) return;
 
-        ExportShape(ctx, cameraRef.current, selectedExportScale, fileName, shapes);
+        ExportShape(ctx, cameraRef.current, selectedExportScale, fileName, history.present.shapes);
     }
     function handleSave(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
-        SaveFile(fileName, shapes, showGrid, snapToGrid, gridSubdivions);
+        SaveFile(fileName, history.present.shapes, showGrid, snapToGrid, gridSubdivions);
     }
     function handleLoad(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
-        LoadFile(setFileName, setShapes, setShowGrid, setSnapToGrid, setGridSubdivisions);
+        LoadFile(setFileName, commit, setShowGrid, setSnapToGrid, setGridSubdivisions);
     }
 
-    function handleClickAddShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        AddNewShape();
+    function handleClickAddShape(shape: string): void {
+        AddNewShape(shape);
     }
-    function AddNewShape(): Shape {
-        const shape: Shape = CreateDefaultShape();
 
-        setShapes(prev => [...prev, shape]);
-        setSelectedShapeIndex(shapes.length);
+    function AddNewShape(shape: string): Shape {
+
+        let newShape: Shape = CreateBaseShape();
+        if (shape === "empty") {
+            newShape = CreateBaseShape();
+        }
+        if (shape === "circle") {
+            newShape = CreateBaseShape([CreateCircle()]);
+        }
+        if (shape === "square") {
+            newShape = CreateBaseShape([CreateSquare()]);
+        }
+        if (shape === "triangle") {
+            newShape = CreateBaseShape([CreateTriangle()]);
+        }
+
+        commit(prev => [...prev, newShape]);
+        setSelectedShapeIndex(history.present.shapes.length);
         setSelectedPathIndex(0);
-        return shape;
+        return newShape;
     }
 
     function DeleteSelectedShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         if (selectedShapeIndex === -1) return;
-        setShapes(prev => [...prev.filter(s => s !== shape)]);
+        commit(prev => [...prev.filter(s => s !== shape)]);
         setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
+        setSelectedSegment(0);
     }
 
     // update shape helper
     function updateSelectedShape(updater: (shape: Shape) => Shape) {
-        setShapes(prev =>
+        commit(prev =>
             prev.map((s, i) => (i === selectedShapeIndex ? updater(s) : s))
         );
     }
@@ -639,8 +745,8 @@ export default function Main() {
         AddNewPath();
     }
     function AddNewPath(): void {
-        if (shapes.length < 1) return;
-        setShapes(prev =>
+        if (history.present.shapes.length < 1) return;
+        commit(prev =>
             prev.map((s, i) => {
                 if (i !== selectedShapeIndex) return s;
 
@@ -652,10 +758,10 @@ export default function Main() {
             })
 
         );
-        setSelectedPathIndex(shapes[selectedShapeIndex].paths.length);
+        setSelectedPathIndex(history.present.shapes[selectedShapeIndex].paths.length);
     }
     function DeleteSelectedPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        setShapes(prev =>
+        commit(prev =>
             prev.map((s, i) => {
                 if (i !== selectedShapeIndex) return s;
 
@@ -669,7 +775,7 @@ export default function Main() {
     }
 
     function moveForward() {
-        setShapes(prev => {
+        commit(prev => {
             const index = selectedShapeIndex;
             if (index === -1 || index >= prev.length - 1) return prev;
 
@@ -682,7 +788,7 @@ export default function Main() {
         });
     }
     function moveBackward() {
-        setShapes(prev => {
+        commit(prev => {
             const index = selectedShapeIndex;
             if (index <= 0) return prev;
 
@@ -695,34 +801,49 @@ export default function Main() {
         });
     }
 
+    // type Commit = (updater: (prev: Shape[]) => Shape[]) => void;
 
-    function RemoveFromLocalStorage(id: string) {
-        // document. alert if you want to delete
-        const stored = localStorage.getItem(RECENTFILESKEY);
-        if (!stored) return;
+    function commit(updater: (prevShapes: Shape[]) => Shape[]) {
+        setHistory(prev => {
+            const newShapes = updater(prev.present.shapes).map(s => ({
+                ...s,
+                paths: s.paths.map(p => ({ ...p, points: [...p.points] }))
+            }));
 
-        try {
-            const filesAsStrings: string[] = JSON.parse(stored);
-
-            // Remove matching file
-            const filtered = filesAsStrings.filter(str => {
-                const file: SaveData = JSON.parse(str);
-                return file.id !== id;
-            });
-
-            localStorage.setItem(RECENTFILESKEY, JSON.stringify(filtered));
-
-            // Update state (important so UI refreshes)
-            const parsedFiles: SaveData[] = filtered.map(f => JSON.parse(f));
-            setRecentFiles(parsedFiles);
-
-        } catch (e) {
-            console.error("Failed removing recent file", e);
-        }
+            return {
+                past: [...prev.past, JSON.parse(JSON.stringify(prev.present))], // deep copy
+                present: { shapes: newShapes },
+                future: []
+            };
+        });
     }
 
+    function undo() {
+        setHistory(prev => {
+            if (prev.past.length === 0) return prev;
 
+            const previous = prev.past[prev.past.length - 1];
 
+            return {
+                past: prev.past.slice(0, -1),
+                present: previous,
+                future: [prev.present, ...prev.future]
+            };
+        });
+    }
+    function redo() {
+        setHistory(prev => {
+            if (prev.future.length === 0) return prev;
+
+            const next = prev.future[0];
+
+            return {
+                past: [...prev.past, prev.present],
+                present: next,
+                future: prev.future.slice(1)
+            };
+        });
+    }
     return (
         <>
             <div className="flex flex-row gap-4 justify-between ">
@@ -767,7 +888,7 @@ export default function Main() {
                                     return (
                                         <div
                                             key={i}
-                                            onMouseDown={() => { if (tool === "Delete") { handleRemovePoint(i) }; if (tool === "Select" || tool === "Move") { startDragging(i); setSelectedPointIndex(i); } }}
+                                            onMouseDown={(e) => handleKnobMouseDown(e, i)}
                                             style={{
                                                 top: y,
                                                 left: x,
@@ -782,6 +903,7 @@ export default function Main() {
                                 ${bgHoverColor}
                                 border-2 
                                 border-black
+                                pointer-events-auto
                                 ${tool === "Delete" ? "cursor-crosshair" : "cursor-pointer"}
                                 `
                                             }></div>
@@ -804,7 +926,7 @@ export default function Main() {
                                 id="Canvas"
                                 ref={canvasRef}
 
-                                className="absolute inset-0 z-10"
+                                className="absolute inset-0 z-10 pointer-events-all"
                             />
                             <canvas
                                 id="CanvasGrid"
@@ -817,6 +939,21 @@ export default function Main() {
                 {/* Controls */}
                 <div className="panel overflow-scroll h-screen">
                     {/* Selected point */}
+                    <div className="panel2">
+                        <h2 className="panel2header">History</h2>
+                        <div className="panel2content">
+                            <div className="flex flex-row gap-2">
+                                <p>past: {history.past.length}</p>
+                                <p>future: {history.future.length}</p>
+                            </div>
+                            <div className="flex flex-row gap-2">
+                                <button onClick={(_e) => undo()} title="Undo" ><i className="fa-solid fa-undo"></i></button>
+                                <button onClick={(_e) => redo()} title="Redo" ><i className="fa-solid fa-redo"></i></button>
+                            </div>
+                            {/* <input type="range" value={history.past.length} min={0} max={history.past.length + history.future.length}></input> */}
+
+                        </div>
+                    </div>
                     {selectedPointIndex !== -1 &&
                         <div className="panel2">
                             <h2 className="panel2header">Selected point</h2>
@@ -863,12 +1000,15 @@ export default function Main() {
                     <div className="panel2">
                         <h2 className="panel2header">Shape</h2>
                         <div className="panel2content">
-                            <p>Shapes: {shapes.length}</p>
+                            <p>Shapes: {history.present.shapes.length}</p>
                             <div className="flex flex-row gap-2">
-                                <button title="Add shape" onClick={handleClickAddShape}><i className="fa fa-circle-plus"></i></button>
+                                <button title="Add empty shape" onClick={() => handleClickAddShape("empty")}><i className="fa fa-plus"></i></button>
+                                <button title="Add circle shape" onClick={() => handleClickAddShape("circle")}><i className="fa fa-circle"></i></button>
+                                <button title="Add circle shape" onClick={() => handleClickAddShape("square")}><i className="fa fa-square"></i></button>
+                                <button title="Add triangle shape" onClick={() => handleClickAddShape("triangle")}><i className="fa fa-play rotate-270"></i></button>
                             </div>
                             <p>Selected shape:
-                                <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
+                                <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={history.present.shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
                             </p>
                             {shape &&
 
@@ -876,7 +1016,7 @@ export default function Main() {
                                     <p>Order:</p>
                                     <button onClick={moveForward}><i className="fa fa-arrow-up"></i></button>
                                     <button onClick={moveBackward}><i className="fa fa-arrow-down"></i></button>
-                                    {shapes.length > 0 && selectedShapeIndex !== -1 &&
+                                    {history.present.shapes.length > 0 && selectedShapeIndex !== -1 &&
                                         <button title="Delete shape" onClick={DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
                                     }
                                 </div>
@@ -888,7 +1028,7 @@ export default function Main() {
                             <h2 className="panel2header">Paths</h2>
                             <div className="panel2content">
                                 <p>Path:
-                                    <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={shapes[selectedShapeIndex]?.paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
+                                    <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={history.present.shapes[selectedShapeIndex]?.paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
                                 </p>
                                 <div className="flex flex-row gap-2">
                                     <button title="Add path" onClick={handleClickAddNewPath}><i className="fa fa-circle-plus"></i></button>
@@ -1032,13 +1172,13 @@ export default function Main() {
                                 <button title="Export/Download" onClick={handleExport}><i className="fa-solid fa-download"></i></button>
                                 <button title="Save" onClick={handleSave}><i className="fa-solid fa-floppy-disk"></i></button>
                                 <button title="Load" onClick={handleLoad}><i className="fa-solid fa-folder"></i></button>
-                                <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
+                                <button title="New" onClick={() => { commit(() => [CreateBaseShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
                             </div>
                             <div className="flex flex-col gap-2">
                                 {recentFiles.map((file, index) =>
                                     <div className="flex flex-row gap-2" key={index}>
-                                        <button onClick={() => { setShapes(file.shapes); setFileName(file.fileName) }} >{file.fileName}</button>
-                                        <button onClick={() => { RemoveFromLocalStorage(file.id) }} ><i className="fa-solid fa-x"></i></button>
+                                        <button onClick={() => { if (changeDetected()) { commit(() => file.shapes) }; setFileName(file.fileName) }} >{file.fileName}</button>
+                                        <button onClick={() => { RemoveFromLocalStorage(file.id, setRecentFiles) }} ><i className="fa-solid fa-x"></i></button>
                                     </div>
                                 )}
                             </div>

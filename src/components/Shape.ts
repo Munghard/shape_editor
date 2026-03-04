@@ -1,10 +1,11 @@
 import type { Camera } from "./Camera";
 
+export type Path = {
+    points: Point[];
+    isHole: boolean;
+}
 export type Shape = {
-    paths: {
-        points: Point[];
-        isHole: boolean;
-    }[]
+    paths: Path[]
 
     cyclic: boolean;
 
@@ -20,12 +21,50 @@ export type Point = {
     y: number;
 }
 
-export function CreateDefaultShape(): Shape {
+export function CreateEmptyPath(): Path {
     return {
-        paths: [{
-            points: [],
-            isHole: false,
-        }],
+        points: [],
+        isHole: false,
+    }
+}
+// Triangle
+export function CreateTriangle(): Path {
+    return {
+        points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 25, y: 50 }],
+        isHole: false
+    }
+};
+// Square
+export function CreateSquare(): Path {
+    return {
+        points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 0, y: 50 }],
+        isHole: false
+    }
+};
+// Circle
+export function CreateCircle(): Path {
+    return CirclePath(50, 32);
+
+};
+export function CirclePath(radius = 50, segments = 32): Path {
+    const points: Point[] = [];
+    for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * 2 * Math.PI;
+        points.push({
+            x: Math.cos(angle) * radius,
+            y: Math.sin(angle) * radius
+        });
+    }
+    return {
+        points,
+        isHole: false
+    };
+}
+
+export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
+
+    return {
+        paths,
         cyclic: true,
         fillColor: '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'),
         strokeColor: "#ffffff",

@@ -26,6 +26,13 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, cam
         -camera.y * camera.zoom
     );
 
+    ctx.font = "120px Verdana";
+    ctx.fillStyle = "gray";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("LIGMA", 0, 0);
+
+
     // define grid spacing in world units
     const spacing = 1000 / subdivision; // e.g., 100 world units per grid line
 
@@ -34,10 +41,12 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, cam
     const startY = Math.floor(camera.y / spacing) * spacing;
 
     // draw vertical lines
+    ctx.font = "16px Verdana";
     const endX = camera.x + canvasWidth / camera.zoom;
     for (let x = startX; x <= endX; x += spacing) {
         ctx.moveTo(x, camera.y);
         ctx.lineTo(x, camera.y + canvasHeight / camera.zoom);
+        ctx.fillText(x.toFixed(1).toString(), x, camera.y + 30);
     }
 
     // draw horizontal lines
@@ -45,6 +54,7 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, cam
     for (let y = startY; y <= endY; y += spacing) {
         ctx.moveTo(camera.x, y);
         ctx.lineTo(camera.x + canvasWidth / camera.zoom, y);
+        ctx.fillText(y.toFixed(1).toString(), camera.x + 30, y);
     }
 
     ctx.lineWidth = 1 / camera.zoom; // keep line width constant on zoom
