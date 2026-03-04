@@ -4,8 +4,12 @@ import { ClearGrid, DrawGrid } from "./Grid";
 import { CreateDefaultShape, DrawShape, type Shape, type Point } from "./Shape";
 import getHoveredSegment from "./Segment";
 import { type SaveData } from "./SaveData";
+import { ExportShape, LoadFile, SaveFile } from "./File";
 
 type Tool = "Select" | "Move" | "Insert" | "Delete" | "Pan";
+
+export const MAX_RECENT = 5;
+export const RECENTFILESKEY = "recentFiles";
 
 export default function Main() {
     // File
@@ -42,8 +46,8 @@ export default function Main() {
         zoom: 1,
     })
     // EDITOR
-    const MAX_RECENT = 5;
-    const RECENTFILESKEY = "recentFiles";
+
+
     const [recentFiles, setRecentFiles] = useState<SaveData[]>([]);
 
     const [selectedPathIndex, setSelectedPathIndex] = useState<number>(0);
@@ -529,100 +533,23 @@ export default function Main() {
             return newZoom;
         });
     }
-
-    function ExportShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        const canvas = document.getElementById("Canvas") as HTMLCanvasElement;
-        if (!canvas) return;
+    function handleExport(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+        if (!canvasRef.current) return;
 
         const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = canvasWidth * Number(selectedExportScale);
-        tempCanvas.height = canvasHeight * Number(selectedExportScale);
+        tempCanvas.width = canvasRef.current?.width * Number(selectedExportScale);
+        tempCanvas.height = canvasRef.current?.height * Number(selectedExportScale);
 
         const ctx = tempCanvas.getContext("2d");
         if (!ctx) return;
 
-        // scale context
-        ctx.scale(Number(selectedExportScale), Number(selectedExportScale));
-
-        // draw shapes onto temp canvas
-        shapes.forEach(shape => DrawShape(ctx, shape, cameraRef.current)); // adjust DrawShape to accept ctx
-
-        // Export
-        const dataUrl = tempCanvas.toDataURL("image/png");
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = fileName + ".png"
-        link.click();
+        ExportShape(ctx, cameraRef.current, selectedExportScale, fileName, shapes);
     }
-
-    function SaveShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        const saveData: SaveData = {
-            id: crypto.randomUUID(),
-            fileName,
-            shapes,
-            useGrid: showGrid,
-            snapGrid: snapToGrid,
-            gridSubd: gridSubdivions
-        }
-        const json = JSON.stringify(saveData);
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        AddToRecentFiles(json);
-
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = fileName + ".json"
-        link.click();
-
-        // clean up
-        URL.revokeObjectURL(url);
+    function handleSave(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+        SaveFile(fileName, shapes, showGrid, snapToGrid, gridSubdivions);
     }
-
-    function LoadShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        // trigger file open dialog
-        const input = document.createElement("input")
-        input.type = "file";
-        input.accept = ".json";
-        input.click();
-
-        input.onchange = (event: Event) => {
-            const target = event.target as HTMLInputElement;
-            if (!target.files || target.files.length === 0) return;
-
-            const file = target.files[0];
-            const reader = new FileReader();
-
-            reader.onload = (evt) => {
-                if (!evt.target) return;
-
-                try {
-                    const text = evt.target.result as string;
-                    const loadData: SaveData = JSON.parse(text);
-
-                    // Apply loaded data to state
-                    setFileName(loadData.fileName);
-                    setShapes(loadData.shapes);
-                    setShowGrid(loadData.useGrid);
-                    setSnapToGrid(loadData.snapGrid);
-                    setGridSubdivisions(loadData.gridSubd);
-
-                    AddToRecentFiles(text);
-                } catch (error) {
-                    console.log("failed to load file.")
-                }
-            };
-            reader.readAsText(file);
-        }
-    }
-
-
-    function AddToRecentFiles(data: string) {
-        const stored = localStorage.getItem(RECENTFILESKEY);
-        let files: string[] = stored ? JSON.parse(stored) : [];
-        files = files.filter(f => f !== data);
-        files.unshift(data);
-        if (files.length > MAX_RECENT) files.slice(0, MAX_RECENT);
-        localStorage.setItem(RECENTFILESKEY, JSON.stringify(files));
+    function handleLoad(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+        LoadFile(setFileName, setShapes, setShowGrid, setSnapToGrid, setGridSubdivisions);
     }
 
     function handleClickAddShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
@@ -1044,10 +971,9 @@ export default function Main() {
                                     <option value={"2"}>2x</option>
                                     <option value={"4"}>4x</option>
                                 </select>
-                                <button title="Export/Download" onClick={ExportShape}><i className="fa-solid fa-download"></i></button>
-
-                                <button title="Save" onClick={SaveShape}><i className="fa-solid fa-floppy-disk"></i></button>
-                                <button title="Load" onClick={LoadShape}><i className="fa-solid fa-folder"></i></button>
+                                <button title="Export/Download" onClick={handleExport}><i className="fa-solid fa-download"></i></button>
+                                <button title="Save" onClick={handleSave}><i className="fa-solid fa-floppy-disk"></i></button>
+                                <button title="Load" onClick={handleLoad}><i className="fa-solid fa-folder"></i></button>
                                 <button title="New" onClick={() => { setShapes([CreateDefaultShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
                             </div>
                             <div className="flex flex-col gap-2">

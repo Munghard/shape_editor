@@ -5,11 +5,13 @@ DONE
 - [x] better ux for selecting shapes and paths, implement select, insert and move tools
 - [x] logic for adding points on last segment index (cyclic)
 - [x] open recent files
+- [x] size of canvas
+- [x] infinite canvas
 
 TODO
-- [ ] size of canvas
+- [ ] export is now broken
+- [ ] snap to grid is now broken, different grid drawing in drawgrid
 - [ ] opacity to stroke and fill
-- [ ] infinite canvas
 - [ ]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
 
 QOL
