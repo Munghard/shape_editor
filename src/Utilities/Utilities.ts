@@ -55,3 +55,21 @@ export function hexToRgba(hex: string, alpha: number) {
 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+export function getShapeCenter(shape: Shape) {
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+
+    shape.paths.forEach(path => {
+        path.points.forEach(p => {
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+        });
+    });
+
+    return {
+        x: (minX + maxX) / 2,
+        y: (minY + maxY) / 2
+    };
+}

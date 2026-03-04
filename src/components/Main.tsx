@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { ClearCanvas, getRandomColor, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
+import { ClearCanvas, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
 import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
 import getHoveredSegment from "./Segment";
@@ -7,7 +7,7 @@ import { type SaveData } from "./SaveData";
 import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
 import type { History } from "./History";
 
-type Tool = "Select" | "Move" | "Insert" | "Delete" | "Pan";
+type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan";
 
 export const MAX_RECENT = 5;
 export const RECENTFILESKEY = "recentFiles";
@@ -150,6 +150,14 @@ export default function Main() {
                 redo();
                 e.preventDefault();
             }
+            if (e.key === "s") {
+                setTool("Scale");
+                e.preventDefault();
+            }
+            if (e.key === "r") {
+                setTool("Rotate");
+                e.preventDefault();
+            }
             if (e.key === "Control") {
                 setTool("Move");
                 e.preventDefault();
@@ -288,7 +296,62 @@ export default function Main() {
         let screenX = e.clientX - rect.left;
         let screenY = e.clientY - rect.top;
 
-        if (tool === "Pan" && dragging && lastMouseRef.current) {
+        if (tool === "Rotate" && dragging && lastMouseRef.current) {
+
+            // const dx = screenX - lastMouseRef.current.x;
+            const dy = screenY - lastMouseRef.current.y;
+
+            lastMouseRef.current = { x: screenX, y: screenY };
+
+            const shape = history.present.shapes[selectedShapeIndex];
+            if (!shape) return;
+
+            const center = getShapeCenter(shape);
+
+            // Rotate based on vertical mouse delta (dy)
+            // You can tweak the factor to control sensitivity
+            const angle = dy * 0.01; // radians
+
+            shape.paths.forEach(path => {
+                path.points.forEach(p => {
+                    const offsetX = p.x - center.x;
+                    const offsetY = p.y - center.y;
+
+                    // apply rotation
+                    const rotatedX = offsetX * Math.cos(angle) - offsetY * Math.sin(angle);
+                    const rotatedY = offsetX * Math.sin(angle) + offsetY * Math.cos(angle);
+
+                    p.x = center.x + rotatedX;
+                    p.y = center.y + rotatedY;
+                });
+            });
+            Draw();
+        }
+        if (tool === "Scale" && dragging && lastMouseRef.current) {
+            console.log("scaling before shape");
+
+            // const dx = screenX - lastMouseRef.current.x;
+            const dy = screenY - lastMouseRef.current.y;
+
+            lastMouseRef.current = { x: screenX, y: screenY };
+
+            const shape = history.present.shapes[selectedShapeIndex];
+            if (!shape) return;
+
+            const center = getShapeCenter(shape);
+
+            const scaleFactor = Math.max(0.1, 1 + dy * 0.01);
+
+            shape.paths.forEach(path => {
+                path.points.forEach(p => {
+                    p.x = center.x + (p.x - center.x) * scaleFactor;
+                    p.y = center.y + (p.y - center.y) * scaleFactor;
+                });
+            });
+            console.log("scaling");
+            Draw();
+        }
+        else if (tool === "Pan" && dragging && lastMouseRef.current) {
             if (!lastMouseRef.current) return
 
             // delta in screen pixels
@@ -305,7 +368,7 @@ export default function Main() {
             ReDrawGrid();
             // console.log(cameraRef.current.x, cameraRef.current.y)
         }
-        if (tool === "Move") {
+        else if (tool === "Move") {
             // return if no shape selected
             if (!shape) return;
             // move all points in paths in shape
@@ -401,7 +464,7 @@ export default function Main() {
         const screenY = e.clientY - rect.top;
         var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
 
-        if (tool === "Pan") {
+        if (tool === "Pan" || tool === "Scale" || tool === "Rotate") {
             lastMouseRef.current = { x: screenX, y: screenY }
         }
         if (tool === "Select" || tool === "Move") {
@@ -903,6 +966,8 @@ export default function Main() {
                         <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select"><i className="fa-solid fa-arrow-pointer"></i></button>
                         <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert"><i className="fa-solid fa-pencil"></i></button>
                         <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                        <button className={`${tool === "Rotate" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Rotate")} title="Rotate"><i className="fa-solid fa-rotate"></i></button>
+                        <button className={`${tool === "Scale" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Scale")} title="Scale"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                         <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete"><i className="fa-solid fa-eraser"></i></button>
                         <button className={`${tool === "Pan" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Pan")} title="Pan"><i className="fa-solid fa-hand"></i></button>
                     </div>
@@ -913,7 +978,7 @@ export default function Main() {
                         <h2>Shapes</h2>
                         {history.present && history.present.shapes.map((_s, i) => {
                             return (
-                                <div className="flex flex-row gap-2">
+                                <div key={i} className="flex flex-row gap-2">
                                     <button onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
                                     <button onClick={() => DeleteShape(i)}>X</button>
                                 </div>
@@ -923,7 +988,7 @@ export default function Main() {
                         <h2>Paths</h2>
                         {shape && shape.paths.map((_s, i) => {
                             return (
-                                <div className="flex flex-row gap-2">
+                                <div key={i} className="flex flex-row gap-2">
                                     <button onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
                                     <button onClick={() => DeletePath(i)}>X</button>
                                 </div>
@@ -1026,7 +1091,7 @@ export default function Main() {
                             </div>
                             <button onClick={(_e) => setHistory({
                                 past: [],
-                                present: { shapes: [] },
+                                present: history.present,
                                 future: []
                             })} title="Clear" ><i className="fa-solid fa-rectangle-xmark"></i></button>
                             {/* <input type="range" value={history.past.length} min={0} max={history.past.length + history.future.length}></input> */}
