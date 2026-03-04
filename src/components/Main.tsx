@@ -1117,7 +1117,7 @@ export default function Main() {
                                 </div>
                                 {/* Line width */}
                                 <div className="flex flex-col">
-                                    <label>Stroke width</label>
+                                    <label>Stroke width: {shape?.strokeWidth}</label>
                                     <input
                                         type="range"
                                         value={shape?.strokeWidth}
@@ -1152,7 +1152,7 @@ export default function Main() {
                                 <input type="checkbox" checked={showKnobs} onChange={(e) => setShowKnobs(e.target.checked)} />
                             </div>
                             <div className="flex flex-col ">
-                                <label>Knob size</label>
+                                <label>Knob size: {knobSize}</label>
                                 <input type="range" value={knobSize} min={8} max={64} onChange={handleKnobSize} />
                             </div>
 
@@ -1178,8 +1178,8 @@ export default function Main() {
                             </div>
                             {/* Grid subd */}
                             <div className="flex flex-col ">
-                                <label>Grid subdivision</label>
-                                <input type="range" value={gridSubdivions} min={2} max={128} onChange={(e) => setGridSubdivisions(Number(e.target.value))} />
+                                <label>Grid subdivision: {gridSubdivions}</label>
+                                <input type="range" value={gridSubdivions} min={1} max={128} onChange={(e) => setGridSubdivisions(Number(e.target.value))} />
                             </div>
                         </div>
                     </div>
