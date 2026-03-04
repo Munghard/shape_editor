@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { ClearCanvas, lerpVec2, screenToWorld, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
 import { CreateDefaultShape, DrawShape, type Shape, type Point } from "./Shape";
@@ -130,6 +130,49 @@ export default function Main() {
         }
     }, [selectedPointIndex, shape]);
 
+    // HOTKEYS
+    useEffect(() => {
+        function handleKeyDown(e: globalThis.KeyboardEvent) {
+            if (e.repeat) return;
+            if (e.key === "Control") {
+                setTool("Move");
+            }
+            if (e.code === "Space") {
+                setTool("Pan");
+            }
+            if (e.key === "Shift") {
+                setTool("Insert");
+            }
+            if (e.key === "Alt") {
+                setTool("Delete");
+            }
+            e.preventDefault();
+        }
+
+        function handleKeyUp(e: globalThis.KeyboardEvent): void {
+            if (e.key === "Control") {
+                setTool("Select");
+            }
+            if (e.code === "Space") {
+                setTool("Select");
+            }
+            if (e.key === "Shift") {
+                setTool("Select");
+            }
+            if (e.key === "Alt") {
+                setTool("Select");
+            }
+            e.preventDefault();
+        }
+
+        window.addEventListener("keydown", handleKeyDown);
+        window.addEventListener("keyup", handleKeyUp);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+            window.removeEventListener("keyup", handleKeyUp);
+        }
+    }, []);
+
     // RESIZE CANVASES
     useEffect(() => {
         resizeCanvases();
@@ -143,6 +186,7 @@ export default function Main() {
         ClearCanvas(ctx);
         DrawGrid(ctx, gridSubdivions, cameraRef.current);
     }
+
 
     function resizeCanvases() {
         if (!canvasRef.current) return;
@@ -321,16 +365,30 @@ export default function Main() {
     }
 
     function selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
+        const prevShape = selectedShapeIndex;
+        const prevPath = selectedPathIndex;
+
         setSelectedShapeIndex(-1);
         setSelectedPathIndex(-1);
         setSelectedPointIndex(-1);
 
         for (let i = shapes.length - 1; i >= 0; i--) {
             buildPath(ctx, shapes[i]);
+
             if (ctx.isPointInPath(x, y)) {
+
                 setSelectedShapeIndex(i);
-                setSelectedPathIndex(0);
-                break; // stop at first (topmost) hit
+
+                let nextPathIndex = 0;
+
+                if (i === prevShape) {
+                    // cycle to next path
+                    const pathCount = shapes[i].paths.length;
+                    nextPathIndex = (prevPath + 1) % pathCount;
+                }
+
+                setSelectedPathIndex(nextPathIndex);
+                break;
             }
         }
     }
@@ -691,7 +749,7 @@ export default function Main() {
                     <div className="flex flex-col gap-4 flex-1 overflow-hidden">
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
 
-                            {showKnobs &&
+                            {showKnobs && !dragging &&
                                 shape && shape.paths[selectedPathIndex]?.points.map((p, i) => {
                                     if (canvasRect == null) return;
                                     const selected = selectedPointIndex === i;

@@ -7,10 +7,12 @@ DONE
 - [x] open recent files
 - [x] size of canvas
 - [x] infinite canvas
+- [x] export is now broken
+- [x] tool panel attach to left, other panel attach right
 
 TODO
-- [ ] export is now broken
 - [ ] snap to grid is now broken, different grid drawing in drawgrid
+- [ ] Multi shape select
 - [ ] opacity to stroke and fill
 - [ ]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
 
@@ -19,4 +21,3 @@ QOL
 - [ ] display value of sliders
 - [ ] light theme
 - [ ] collapsible panels
-- [ ] tool panel attach to left, other panel attach right
