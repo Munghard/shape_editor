@@ -45,3 +45,6 @@ export function shapesEqual(a: Shape[], b: Shape[]) {
     }
     return true;
 }
+export function getRandomColor(): string {
+    return '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
+}

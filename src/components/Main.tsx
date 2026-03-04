@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { ClearCanvas, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
+import { ClearCanvas, getRandomColor, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
 import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
 import getHoveredSegment from "./Segment";
@@ -418,6 +418,7 @@ export default function Main() {
         }
         setDragging(true);
     }
+
     function handleMouseUp(_e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
         setDragging(false);
 
@@ -533,8 +534,13 @@ export default function Main() {
         if (!path) return;
 
         const rect = e.currentTarget.getBoundingClientRect();
-        let x = e.clientX - rect.left;
-        let y = e.clientY - rect.top;
+        const cam = cameraRef.current;
+
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+
+        let x = canvasX / cam.zoom + cam.x;
+        let y = canvasY / cam.zoom + cam.y;
 
         let newPoint: Point;
 
@@ -557,11 +563,11 @@ export default function Main() {
         } else {
             if (snapToGrid) {
                 if (!canvasRef.current) return;
-                const gridSizeX = canvasRef.current.width / gridSubdivions;
-                const gridSizeY = canvasRef.current.height / gridSubdivions;
 
-                x = Math.round(x / gridSizeX) * 1000 / gridSubdivions;
-                y = Math.round(y / gridSizeY) * 1000 / gridSubdivions;
+                const spacing = 1000 / gridSubdivions;
+
+                x = Math.round(x / spacing) * spacing;
+                y = Math.round(y / spacing) * spacing;
             }
 
             newPoint = { x, y };
@@ -972,6 +978,11 @@ export default function Main() {
                                 <button disabled={history.past.length < 1} onClick={(_e) => undo()} title="Undo" ><i className="fa-solid fa-undo"></i></button>
                                 <button disabled={history.future.length < 1} onClick={(_e) => redo()} title="Redo" ><i className="fa-solid fa-redo"></i></button>
                             </div>
+                            <button onClick={(_e) => setHistory({
+                                past: [],
+                                present: { shapes: [] },
+                                future: []
+                            })} title="Clear" ><i className="fa-solid fa-rectangle-xmark"></i></button>
                             {/* <input type="range" value={history.past.length} min={0} max={history.past.length + history.future.length}></input> */}
 
                         </div>
@@ -1077,6 +1088,7 @@ export default function Main() {
                                                 updateSelectedShape(s => ({ ...s, useStroke: e.target.checked }))
                                             }
                                         />
+                                        <button onClick={(_e) => updateSelectedShape(s => ({ ...s, strokeColor: getRandomColor() }))}>Randomize</button>
                                     </div>
                                 </div>
 
@@ -1100,6 +1112,7 @@ export default function Main() {
                                                 updateSelectedShape(s => ({ ...s, useFill: e.target.checked }))
                                             }
                                         />
+                                        <button onClick={(_e) => updateSelectedShape(s => ({ ...s, fillColor: getRandomColor() }))}>Randomize</button>
                                     </div>
                                 </div>
                                 {/* Line width */}
