@@ -9,6 +9,8 @@ DONE
 - [x] infinite canvas
 - [x] export is now broken
 - [x] tool panel attach to left, other panel attach right
+- [x] display value of sliders
+- [x] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool
 
 TODO
 - [ ] center camera button
@@ -21,7 +23,5 @@ TODO
 - [ ]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
 
 QOL
-- [ ] alt keys to use tool ie. hold alt to use delete tool, hold ctrl to use select tool, hold shift to use insert tool
-- [ ] display value of sliders
 - [ ] light theme
 - [ ] collapsible panels

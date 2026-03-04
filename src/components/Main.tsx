@@ -23,7 +23,7 @@ export default function Main() {
     });
 
     // FILE
-    const [fileName, setFileName] = useState<string>("Image");
+    const [fileName, setFileName] = useState<string>("NewFile");
 
     // CANVAS
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,6 +36,8 @@ export default function Main() {
 
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
+    const [gridColor, setGridColor] = useState<string>("#ffffff");
+    const [gridAlpha, setGridAlpha] = useState<number>(0.1);
 
     const [showGrid, setShowGrid] = useState<boolean>(true);
     const [gridSubdivions, setGridSubdivisions] = useState<number>(8);
@@ -114,7 +116,7 @@ export default function Main() {
             var ctx = c.getContext("2d") as CanvasRenderingContext2D;
             ClearGrid(ctx);
         }
-    }, [showGrid, gridSubdivions]);
+    }, [showGrid, gridSubdivions, gridAlpha, gridColor]);
 
 
     // SELECTED POINT
@@ -213,7 +215,7 @@ export default function Main() {
         var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
         var ctx = c.getContext("2d") as CanvasRenderingContext2D;
         ClearCanvas(ctx);
-        DrawGrid(ctx, gridSubdivions, cameraRef.current);
+        DrawGrid(ctx, gridColor, gridAlpha, gridSubdivions, cameraRef.current);
     }
 
 
@@ -761,6 +763,12 @@ export default function Main() {
         setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
         setSelectedSegment(0);
     }
+    function DeleteShape(index: number): void {
+        if (index === -1) return;
+        commit(prev => [...prev.filter((_s, i) => i !== index)]);
+        setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
+        setSelectedSegment(0);
+    }
 
     // update shape helper
     function updateSelectedShape(updater: (shape: Shape) => Shape) {
@@ -795,6 +803,19 @@ export default function Main() {
 
                 const newPaths = [
                     ...s.paths.filter((_p, i) => i !== selectedPathIndex)
+                ];
+                return { ...s, paths: newPaths }
+            })
+        );
+        setSelectedPathIndex(prev => Math.max(prev - 1, 0));
+    }
+    function DeletePath(index: number): void {
+        commit(prev =>
+            prev.map((s, i) => {
+                if (i !== index) return s;
+
+                const newPaths = [
+                    ...s.paths.filter((_p, i) => i !== index)
                 ];
                 return { ...s, paths: newPaths }
             })
@@ -886,6 +907,31 @@ export default function Main() {
                         <button className={`${tool === "Pan" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Pan")} title="Pan"><i className="fa-solid fa-hand"></i></button>
                     </div>
                 </div>
+                {/* shaped and paths */}
+                <div id="paths" className="panel">
+                    <div className="flex flex-col gap-2">
+                        <h2>Shapes</h2>
+                        {history.present && history.present.shapes.map((_s, i) => {
+                            return (
+                                <div className="flex flex-row gap-2">
+                                    <button onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
+                                    <button onClick={() => DeleteShape(i)}>X</button>
+                                </div>
+                            )
+                        })}
+                        <br />
+                        <h2>Paths</h2>
+                        {shape && shape.paths.map((_s, i) => {
+                            return (
+                                <div className="flex flex-row gap-2">
+                                    <button onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
+                                    <button onClick={() => DeletePath(i)}>X</button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+
                 <div id="middle_column" className="flex flex-col flex-1 w-screen h-screen ">
                     <div className='top-0 shrink-0'>
                         <div className='flex flex-row gap-2'>
@@ -1165,6 +1211,20 @@ export default function Main() {
                             <div className="flex flex-col ">
                                 <label>Background</label>
                                 <input className="colorSelect" type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+                            </div>
+
+                            <p>Grid</p>
+                            <div className="flex flex-col ">
+                                {/* this could be a component */}
+                                <div className="flex flex-row gap-2 items-center">
+                                    <input className="colorSelect" type="color" value={gridColor} onChange={(e) => setGridColor(e.target.value)} />
+                                    <div className="flex flex-row gap-2 items-center ">
+                                        <p >Alpha:</p>
+                                        <input type="number" step={0.1} min={0} max={1} value={gridAlpha} onChange={(e) => setGridAlpha(Number(e.target.value))}></input>
+                                    </div>
+                                </div>
+                                <input type="range" value={gridAlpha} step={0.01} min={0} max={1} onChange={(e) => setGridAlpha(Number(e.target.value))} />
+                                {/* this could be a component */}
                             </div>
                             {/* Toggle grid */}
                             <div className="flex flex-row gap-2 ">

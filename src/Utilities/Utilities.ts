@@ -48,3 +48,10 @@ export function shapesEqual(a: Shape[], b: Shape[]) {
 export function getRandomColor(): string {
     return '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0');
 }
+export function hexToRgba(hex: string, alpha: number) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}

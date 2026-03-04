@@ -1,3 +1,4 @@
+import { hexToRgba } from "../Utilities/Utilities";
 import type { Camera } from "./Camera";
 
 export function ClearGrid(ctx: CanvasRenderingContext2D) {
@@ -6,7 +7,7 @@ export function ClearGrid(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 }
 
-export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, camera: Camera) {
+export function DrawGrid(ctx: CanvasRenderingContext2D, color: string, alpha: number, subdivision: number, camera: Camera) {
     const canvas = ctx.canvas;
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
@@ -27,7 +28,7 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, cam
     );
 
     ctx.font = "120px Verdana";
-    ctx.fillStyle = "gray";
+    ctx.fillStyle = "rgb(60,60,60)";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("LIGMA", 0, 0);
@@ -56,8 +57,9 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, subdivision: number, cam
         ctx.lineTo(camera.x + canvasWidth / camera.zoom, y);
         ctx.fillText(y.toFixed(1).toString(), camera.x + 30, y);
     }
+    const colorWithAlpha = hexToRgba(color, alpha);
 
     ctx.lineWidth = 1 / camera.zoom; // keep line width constant on zoom
-    ctx.strokeStyle = "gray";
+    ctx.strokeStyle = colorWithAlpha;
     ctx.stroke();
 }
