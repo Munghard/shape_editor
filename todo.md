@@ -11,6 +11,7 @@ DONE
 - [x] tool panel attach to left, other panel attach right
 
 TODO
+- [ ] center camera button
 - [ ] scale shape tool
 - [ ] rotate shape tool
 - [ ] add shapes to a panel where you can select them

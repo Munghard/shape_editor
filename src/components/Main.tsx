@@ -36,7 +36,7 @@ export default function Main() {
 
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
-    const [zoom, setZoom] = useState<number>(1);
+
     const [showGrid, setShowGrid] = useState<boolean>(true);
     const [gridSubdivions, setGridSubdivisions] = useState<number>(8);
 
@@ -47,7 +47,7 @@ export default function Main() {
     const [snapToGrid, setSnapToGrid] = useState<boolean>(false);
 
     // CAMERA
-
+    const [, setTick] = useState(0); // this is for forcing rerender on zoom
     const lastMouseRef = useRef<{ x: number; y: number } | null>(null)
     const cameraRef = useRef({
         x: 0,
@@ -200,6 +200,7 @@ export default function Main() {
         window.addEventListener("resize", resizeCanvases);
         return () => window.removeEventListener("resize", resizeCanvases);
     }, []);
+
     useEffect(() => {
 
         if (canvasRef.current) {
@@ -672,16 +673,37 @@ export default function Main() {
         window.addEventListener('mouseup', onMouseUp);
     }
 
-    function handleScroll(e: React.WheelEvent<HTMLCanvasElement>): void {
-        return; // not sure how to handle the zooming yet
+    function handleScroll(e: React.WheelEvent): void {
+        if (!canvasRef.current) return;
 
-        setZoom(prev => {
-            const factor = 0.001; // scale down the delta
-            let newZoom = prev - e.deltaY * factor; // subtract if you want scrolling up to zoom in
-            newZoom = Math.max(0.1, Math.min(newZoom, 5)); // clamp between min/max zoom
-            return newZoom;
-        });
+        const rect = canvasRef.current.getBoundingClientRect();
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+
+        const cam = cameraRef.current;
+
+        // mouse position in world coordinates
+        const worldX = cam.x + canvasX / cam.zoom;
+        const worldY = cam.y + canvasY / cam.zoom;
+
+        const zoomFactor = 1.2;
+        const delta = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
+
+        // apply zoom
+        cam.zoom *= delta;
+        cam.zoom = Math.max(0.1, Math.min(cam.zoom, 10));
+
+        // adjust camera so the world point under the mouse stays fixed
+        cam.x = worldX - (canvasX / cam.zoom);
+        cam.y = worldY - (canvasY / cam.zoom);
+
+        setTick(t => t + 1); // force React to re-render knobs
+
+        Draw();
+        ReDrawGrid();
+
     }
+
     function handleExport(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         if (!canvasRef.current) return;
 
@@ -883,8 +905,8 @@ export default function Main() {
                                         selected ? 'hover:bg-zinc-100/90' :
                                             'hover:bg-zinc-100/50'
 
-                                    const x = p.x - (_knobSize * 0.5) - cameraRef.current.x;
-                                    const y = p.y - (_knobSize * 0.5) - cameraRef.current.y;
+                                    const x = (p.x - cameraRef.current.x) * cameraRef.current.zoom - (_knobSize * 0.5);
+                                    const y = (p.y - cameraRef.current.y) * cameraRef.current.zoom - (_knobSize * 0.5);
                                     return (
                                         <div
                                             key={i}
@@ -943,12 +965,12 @@ export default function Main() {
                         <h2 className="panel2header">History</h2>
                         <div className="panel2content">
                             <div className="flex flex-row gap-2">
-                                <p>past: {history.past.length}</p>
-                                <p>future: {history.future.length}</p>
+                                <p>undos: {history.past.length}</p>
+                                <p>redos: {history.future.length}</p>
                             </div>
                             <div className="flex flex-row gap-2">
-                                <button onClick={(_e) => undo()} title="Undo" ><i className="fa-solid fa-undo"></i></button>
-                                <button onClick={(_e) => redo()} title="Redo" ><i className="fa-solid fa-redo"></i></button>
+                                <button disabled={history.past.length < 1} onClick={(_e) => undo()} title="Undo" ><i className="fa-solid fa-undo"></i></button>
+                                <button disabled={history.future.length < 1} onClick={(_e) => redo()} title="Redo" ><i className="fa-solid fa-redo"></i></button>
                             </div>
                             {/* <input type="range" value={history.past.length} min={0} max={history.past.length + history.future.length}></input> */}
 
@@ -1027,7 +1049,8 @@ export default function Main() {
                         <div className="panel2">
                             <h2 className="panel2header">Paths</h2>
                             <div className="panel2content">
-                                <p>Path:
+                                <p>Paths: {shape.paths.length}</p>
+                                <p>Selected path:
                                     <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={history.present.shapes[selectedShapeIndex]?.paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
                                 </p>
                                 <div className="flex flex-row gap-2">
@@ -1177,7 +1200,7 @@ export default function Main() {
                             <div className="flex flex-col gap-2">
                                 {recentFiles.map((file, index) =>
                                     <div className="flex flex-row gap-2" key={index}>
-                                        <button onClick={() => { if (changeDetected()) { commit(() => file.shapes) }; setFileName(file.fileName) }} >{file.fileName}</button>
+                                        <button onClick={() => { commit(() => file.shapes); setFileName(file.fileName) }} >{file.fileName}</button>
                                         <button onClick={() => { RemoveFromLocalStorage(file.id, setRecentFiles) }} ><i className="fa-solid fa-x"></i></button>
                                     </div>
                                 )}
