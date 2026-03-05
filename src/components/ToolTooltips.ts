@@ -13,7 +13,7 @@ export function toolTooltip(tool: Tool): string {
         case "Scale":
             return "Drag to scale selected shape, hold ctrl to scale all shapes";
         case "Insert":
-            return "Click to insert point, shift click to create new shape ";
+            return "Click to insert point, shift click to create new shape, ctrl click to add new path/hole ";
         case "Pan":
             return "Drag to pan";
         case "Frame":

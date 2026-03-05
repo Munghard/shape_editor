@@ -1,3 +1,4 @@
+import { APP_NAME } from "../Constants";
 import { hexToRgba } from "../Utilities/Utilities";
 import type { Camera } from "./Camera";
 
@@ -31,7 +32,7 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, color: string, alpha: nu
     ctx.fillStyle = "rgb(60,60,60)";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("LIGMA", 0, 0);
+    ctx.fillText(APP_NAME, 0, 0);
 
 
     // define grid spacing in world units

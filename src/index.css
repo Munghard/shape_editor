@@ -4,7 +4,6 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.2;
   font-weight: 400;
-
   color-scheme: light dark;
   color: rgba(150, 150, 150, 1);
   @apply bg-zinc-900;

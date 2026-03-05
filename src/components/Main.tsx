@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react"
-import { ClearCanvas, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
+import { ClearCanvas, CloneShape, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
-import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect, CreateEmptyPath } from "./Shape";
+import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect } from "./Shape";
 import getHoveredSegment from "./Segment";
 import { type SaveData } from "./SaveData";
 import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
 import type { History } from "./History";
 import { toolTooltip } from "./ToolTooltips";
+import { APP_NAME } from "../Constants";
 
 export type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
@@ -14,6 +15,8 @@ export const MAX_RECENT = 5;
 export const RECENTFILESKEY = "recentFiles";
 
 export default function Main() {
+
+    document.title = APP_NAME;
 
     const [loaded, setLoaded] = useState(false);
     // HISTORY
@@ -353,6 +356,7 @@ export default function Main() {
             lastMouseRef.current = { x: screenX, y: screenY };
 
             const shape = history.present.shapes[selectedShapeIndex];
+            const shapes = history.present.shapes;
             if (!shape) return;
 
             const center = getShapeCenter(shape);
@@ -360,20 +364,41 @@ export default function Main() {
             // Rotate based on vertical mouse delta (dy)
             // You can tweak the factor to control sensitivity
             const angle = dy * 0.01; // radians
+            if (e.ctrlKey) {
+                shapes.forEach(shape => {
+                    shape.paths.forEach(path => {
+                        path.points.forEach(p => {
+                            const offsetX = p.x - center.x;
+                            const offsetY = p.y - center.y;
 
-            shape.paths.forEach(path => {
-                path.points.forEach(p => {
-                    const offsetX = p.x - center.x;
-                    const offsetY = p.y - center.y;
+                            // apply rotation
+                            const rotatedX = offsetX * Math.cos(angle) - offsetY * Math.sin(angle);
+                            const rotatedY = offsetX * Math.sin(angle) + offsetY * Math.cos(angle);
 
-                    // apply rotation
-                    const rotatedX = offsetX * Math.cos(angle) - offsetY * Math.sin(angle);
-                    const rotatedY = offsetX * Math.sin(angle) + offsetY * Math.cos(angle);
-
-                    p.x = center.x + rotatedX;
-                    p.y = center.y + rotatedY;
+                            p.x = center.x + rotatedX;
+                            p.y = center.y + rotatedY;
+                        });
+                    });
                 });
-            });
+            }
+
+            else {
+
+
+                shape.paths.forEach(path => {
+                    path.points.forEach(p => {
+                        const offsetX = p.x - center.x;
+                        const offsetY = p.y - center.y;
+
+                        // apply rotation
+                        const rotatedX = offsetX * Math.cos(angle) - offsetY * Math.sin(angle);
+                        const rotatedY = offsetX * Math.sin(angle) + offsetY * Math.cos(angle);
+
+                        p.x = center.x + rotatedX;
+                        p.y = center.y + rotatedY;
+                    });
+                });
+            }
             Draw();
         }
         if (tool === "Scale" && dragging && lastMouseRef.current) {
@@ -384,18 +409,32 @@ export default function Main() {
             lastMouseRef.current = { x: screenX, y: screenY };
 
             const shape = history.present.shapes[selectedShapeIndex];
+            const shapes = history.present.shapes;
             if (!shape) return;
 
             const center = getShapeCenter(shape);
 
             const scaleFactor = Math.max(0.1, 1 + dy * 0.01);
 
-            shape.paths.forEach(path => {
-                path.points.forEach(p => {
-                    p.x = center.x + (p.x - center.x) * scaleFactor;
-                    p.y = center.y + (p.y - center.y) * scaleFactor;
+            if (e.ctrlKey) {
+                shapes.forEach(shape => {
+                    shape.paths.forEach(path => {
+                        path.points.forEach(p => {
+                            p.x = center.x + (p.x - center.x) * scaleFactor;
+                            p.y = center.y + (p.y - center.y) * scaleFactor;
+                        });
+                    });
                 });
-            });
+            }
+            else {
+
+                shape.paths.forEach(path => {
+                    path.points.forEach(p => {
+                        p.x = center.x + (p.x - center.x) * scaleFactor;
+                        p.y = center.y + (p.y - center.y) * scaleFactor;
+                    });
+                });
+            }
             Draw();
         }
         else if (tool === "Frame" && dragging && lastMouseRef.current) {
@@ -913,20 +952,30 @@ export default function Main() {
         AddNewShape(shape);
     }
 
-    function AddNewShape(shape: string): Shape {
+    function AddNewShape(shapeName: string, shape: Shape | null = null): Shape {
 
         let newShape: Shape = CreateBaseShape();
-        if (shape === "empty") {
-            newShape = CreateBaseShape();
+        if (shape === null) {
+
+            if (shapeName === "empty") {
+                newShape = CreateBaseShape();
+            }
+            if (shapeName === "circle") {
+                newShape = CreateBaseShape([CreateCircle()]);
+            }
+            if (shapeName === "square") {
+                newShape = CreateBaseShape([CreateSquare()]);
+            }
+            if (shapeName === "triangle") {
+                newShape = CreateBaseShape([CreateTriangle()]);
+            }
         }
-        if (shape === "circle") {
-            newShape = CreateBaseShape([CreateCircle()]);
-        }
-        if (shape === "square") {
-            newShape = CreateBaseShape([CreateSquare()]);
-        }
-        if (shape === "triangle") {
-            newShape = CreateBaseShape([CreateTriangle()]);
+        else {
+            newShape = shape;
+
+            // this was to add an offset to the duplicated shape but its adding it to the main shape too and i cant be arsed right now
+            // const offset = { x: 50, y: 50 };
+            // newShape.paths.forEach(pa => pa.points.forEach(po => { po.x += offset.x; po.y += offset.y; }));
         }
 
         const newIndex = history.present.shapes.length;
@@ -1096,7 +1145,7 @@ export default function Main() {
     }
     return (
         <>
-            <div className="flex flex-row gap-4 justify-between ">
+            <div className="flex flex-row justify-between h-screen ">
                 {/* Tools */}
                 <div id="toolbar" className="panel  overflow-auto  h-screen">
                     <div className="flex flex-col gap-2">
@@ -1118,28 +1167,32 @@ export default function Main() {
                     </button>
                     {showShapeBar &&
 
-                        <div className="flex flex-col gap-2">
-                            <h2>Shapes</h2>
-                            {history.present && history.present.shapes.map((_s, i) => {
-                                return (
-                                    <div key={i} className="flex flex-row gap-2">
-                                        <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
-                                        <button title="Delete" onClick={() => DeleteShape(i)}><i className="fa fa-x"></i></button>
-                                        <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
-                                    </div>
-                                )
-                            })}
-                            <br />
-                            <h2>Paths</h2>
-                            {shape && shape.paths.map((_s, i) => {
-                                return (
-                                    <div key={i} className="flex flex-row gap-2">
-                                        <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
-                                        <button title="Delete" onClick={() => DeletePath(i)}><i className="fa fa-x"></i></button>
-                                        {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
-                                    </div>
-                                )
-                            })}
+                        <div className="panel2">
+                            <h2 className="panel2header">Shapes</h2>
+                            <div className="panel2content">
+                                <div className="flex flex-col gap-2">
+                                    {history.present && history.present.shapes.map((_s, i) => {
+                                        return (
+                                            <div key={i} className="flex flex-row gap-2 justify-between">
+                                                <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
+                                                <button title="Delete" onClick={() => DeleteShape(i)}><i className="fa fa-x"></i></button>
+                                                <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
+                                            </div>
+                                        )
+                                    })}
+                                    <br />
+                                    <h2>Paths</h2>
+                                    {shape && shape.paths.map((_s, i) => {
+                                        return (
+                                            <div key={i} className="flex flex-row gap-2 justify-between">
+                                                <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
+                                                <button title="Delete" onClick={() => DeletePath(i)}><i className="fa fa-x"></i></button>
+                                                {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     }
                 </div>
@@ -1149,14 +1202,13 @@ export default function Main() {
                         <div className='flex flex-row gap-2'>
                             {/* app icon */}
                             {/* <img className="size-16" src="./donut.png"></img> */}
-                            <h1 className='mb-10 text-zinc-400 flex text-center'>LIGMA - {fileName}</h1>
+                            <h2 className='m-4 text-zinc-400 flex text-center'>{APP_NAME} - {fileName}</h2>
                         </div>
                     </div>
-                    <div id="canvas-container" className="flex flex-col gap-4 flex-1 overflow-hidden">
+                    <div id="canvas-container" className="flex flex-col gap-4 flex-1  overflow-hidden">
                         {/* Tooltip */}
-                        <div id="Tooltips" className="absolute flex flex-row bottom-0 pb-5 pl-5 w-full z-40">
-                            <p className="">{toolTooltip(tool)}</p>
-                        </div>
+                        <p className="absolute w-50% z-40 p-10 text-zinc-500">Tooltip: {toolTooltip(tool)}</p>
+
                         {/* Knobs */}
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
 
@@ -1206,9 +1258,7 @@ export default function Main() {
                             {/* Export frame */}
                             {tool === "Frame" && canvasRef.current && canvasRef.current &&
                                 (() => {
-
                                     const pos = worldToScreen(frame.x, frame.y, cameraRef.current, canvasRef.current);
-
                                     return (
                                         <div
                                             style={{ left: pos.x, top: pos.y, width: frame.w * cameraRef.current.zoom, height: frame.h * cameraRef.current.zoom, boxShadow: "0 0 0 10000px rgba(0,0,0,0.4)" }}
@@ -1250,14 +1300,14 @@ export default function Main() {
                     </div>
                 </div>
                 {/* Controls */}
-                <div className="panel overflow-scroll h-screen">
+                <div className="panel overflow-scroll overflow-x-hidden h-screen">
                     <button onClick={() => setShowControlsBar(!showControlsBar)}>
                         {showControlsBar ? <i className="fa fa-arrow-right"></i> : <i className="fa fa-arrow-left"></i>}
                     </button>
                     {showControlsBar &&
-                        <div id={"controls-content"}>
+                        <div id={"controls-content "} className="flex flex-col gap-4">
                             {/* Selected point */}
-                            <div className="panel2">
+                            <div className="panel2 ">
                                 <h2 className="panel2header">History</h2>
                                 <div className="panel2content">
                                     <div className="flex flex-row gap-2">
@@ -1333,6 +1383,7 @@ export default function Main() {
                                     <p>Selected shape:
                                         <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={history.present.shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
                                     </p>
+                                    <button onClick={(_e) => AddNewShape("", CloneShape(shape))}>Duplicate</button>
                                     {shape &&
 
                                         <div className="flex flex-row gap-2">
@@ -1407,7 +1458,11 @@ export default function Main() {
                                         </div>
                                         {/* Line width */}
                                         <div className="flex flex-col">
-                                            <label>Stroke width: {shape?.strokeWidth}</label>
+                                            <div className="flex flex-row gap-2">
+
+                                                <label>Stroke width: </label>
+                                                <input className="w-14" type="number" value={shape?.strokeWidth} onChange={(e) => updateSelectedShape(s => ({ ...s, strokeWidth: Number(e.target.value) }))}></input>
+                                            </div>
                                             <input
                                                 type="range"
                                                 value={shape?.strokeWidth}

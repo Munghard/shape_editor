@@ -87,3 +87,12 @@ export function getCanvasMousePos(e: MouseEvent | React.MouseEvent, canvas: HTML
         y: ((e.clientY - rect.top) / rect.height) * canvas.height
     };
 }
+export function CloneShape(shape: Shape): Shape {
+    return {
+        ...shape,
+        paths: shape.paths.map(path => ({
+            ...path,
+            points: path.points.map(p => ({ ...p }))
+        }))
+    };
+}
