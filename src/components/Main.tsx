@@ -8,6 +8,8 @@ import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File"
 import type { History } from "./History";
 import { toolTooltip } from "./ToolTooltips";
 import { APP_NAME } from "../Constants";
+import { Knob } from "./Knob";
+import { Handle } from "./Handle";
 
 export type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
@@ -75,7 +77,7 @@ export default function Main() {
 
     const [recentFiles, setRecentFiles] = useState<SaveData[]>([]);
 
-    ;
+    const draggingRef = useRef<{ index: number, handleIn: boolean } | null>(null);
 
     const [tool, setTool] = useState<Tool>("Select");
 
@@ -312,6 +314,29 @@ export default function Main() {
         return !shapesEqual(current, lastPast);
     }
 
+    function handleAddCurveToPoint(index: number) {
+        commit(prevShapes =>
+            prevShapes.map((s, i) => {
+                if (i !== selectedShapeIndex) return s;
+
+                const newPaths = [...s.paths];
+                const currentPath = { ...newPaths[selectedPathIndex] };
+
+                const newPoints = [...currentPath.points];
+                const p = { ...newPoints[index] };
+
+                p.in = { x: p.x - 20, y: p.y };
+                p.out = { x: p.x + 20, y: p.y };
+
+                newPoints[index] = p;
+                currentPath.points = newPoints;
+
+                newPaths[selectedPathIndex] = currentPath;
+
+                return { ...s, paths: newPaths };
+            })
+        );
+    }
     function handleRemovePoint(index: number) {
 
         commit(prevShapes =>
@@ -564,6 +589,66 @@ export default function Main() {
                 ctx.stroke();
             }
         }
+    }
+    function startHandleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
+        if (!canvasRef.current) return;
+        lastMouseRef.current = getCanvasMousePos(e, canvasRef.current);
+        draggingRef.current = { index, handleIn };
+        window.addEventListener("mousemove", onHandleMouseMove);
+        window.addEventListener("mouseup", stopHandleDrag);
+        e.preventDefault();
+    }
+
+    function onHandleMouseMove(e: MouseEvent) {
+        if (!draggingRef.current) return;
+        handleDrag(e as unknown as React.MouseEvent, draggingRef.current.index, draggingRef.current.handleIn);
+    }
+
+    function stopHandleDrag() {
+        draggingRef.current = null;
+        window.removeEventListener("mousemove", onHandleMouseMove);
+        window.removeEventListener("mouseup", stopHandleDrag);
+    }
+    function handleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
+        if (!canvasRef.current || !lastMouseRef.current) return;
+
+        const cmp = getCanvasMousePos(e, canvasRef.current);
+        const mouseWorld = screenToWorld(cmp.x, cmp.y, cameraRef.current);
+        const lastWorld = screenToWorld(lastMouseRef.current.x, lastMouseRef.current.y, cameraRef.current);
+
+        const dx = mouseWorld.x - lastWorld.x;
+        const dy = mouseWorld.y - lastWorld.y;
+
+        commit(prevShapes =>
+            prevShapes.map((shape, si) => {
+                if (si !== selectedShapeIndex) return shape;
+
+                return {
+                    ...shape,
+                    paths: shape.paths.map((path, pi) => {
+                        if (pi !== selectedPathIndex) return path;
+
+                        return {
+                            ...path,
+                            points: path.points.map((p, i) => {
+                                if (i !== index) return p;
+
+                                return {
+                                    ...p,
+                                    in: handleIn && p.in
+                                        ? { x: p.in.x + dx, y: p.in.y + dy }
+                                        : p.in,
+                                    out: !handleIn && p.out
+                                        ? { x: p.out.x + dx, y: p.out.y + dy }
+                                        : p.out
+                                };
+                            })
+                        };
+                    })
+                };
+            })
+        );
+        lastMouseRef.current = cmp;
     }
 
     function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, i: number) {
@@ -1215,42 +1300,26 @@ export default function Main() {
                             {showKnobs && !dragging &&
                                 shape && shape.paths[selectedPathIndex]?.points.map((p, i) => {
                                     if (canvasRect == null) return;
-                                    const selected = selectedPointIndex === i;
-                                    var _knobSize = selected ? knobSize * 2 : knobSize;
-                                    var bgColor =
-                                        selected ? 'bg-zinc-200/90' :
-                                            ' bg-zinc-200/50';
 
-                                    var bgHoverColor =
-                                        selected ? 'hover:bg-zinc-100/90' :
-                                            'hover:bg-zinc-100/50'
+                                    const selected = selectedPointIndex === i;
                                     if (!canvasRef.current) return;
 
-                                    const { x, y } = worldToScreen(p.x, p.y, cameraRef.current, canvasRef.current);
-                                    const knobX = x - (_knobSize * 0.5);
-                                    const knobY = y - (_knobSize * 0.5);
+                                    const pointScreen = worldToScreen(p.x, p.y, cameraRef.current, canvasRef.current);
+                                    const inScreen = p.in && worldToScreen(p.in.x, p.in.y, cameraRef.current, canvasRef.current);
+                                    const outScreen = p.out && worldToScreen(p.out.x, p.out.y, cameraRef.current, canvasRef.current);
                                     return (
-                                        <div
-                                            key={i}
-                                            onMouseDown={(e) => handleKnobMouseDown(e, i)}
-                                            style={{
-                                                top: knobY,
-                                                left: knobX,
-                                                width: _knobSize,
-                                                height: _knobSize
-                                            }}
-                                            className={
-                                                `
-                                rounded-full
-                                absolute z-9999
-                                ${bgColor}
-                                ${bgHoverColor}
-                                border-2 
-                                border-black
-                                pointer-events-auto
-                                ${tool === "Delete" ? "cursor-crosshair" : "cursor-pointer"}
-                                `
-                                            }></div>
+                                        <>
+                                            <Knob x={pointScreen.x} y={pointScreen.y} i={i} selected={selected} size={knobSize} tool={tool} handleKnobMouseDown={handleKnobMouseDown}></Knob>
+
+                                            {
+                                                inScreen && selected &&
+                                                <Handle x={inScreen.x} y={inScreen.y} handleIn={true} i={i} size={knobSize} startHandleDrag={startHandleDrag}></Handle>
+                                            }
+                                            {
+                                                outScreen && selected &&
+                                                <Handle x={outScreen.x} y={outScreen.y} handleIn={false} i={i} size={knobSize} startHandleDrag={startHandleDrag}></Handle>
+                                            }
+                                        </>
                                     )
                                 })
                             }
@@ -1334,6 +1403,7 @@ export default function Main() {
                                         <div className="flex flex-row gap-2 ">
                                             <input className="w-[10ch]" type="number" value={selectedPointIndex} onChange={handleSelectPoint}></input>
                                             <button title="Delete point" onClick={() => handleRemovePoint(selectedPointIndex)}><i className="fa-solid fa-x"></i></button>
+                                            <button title="Curve point" onClick={() => handleAddCurveToPoint(selectedPointIndex)}><i className="fa-solid fa-bezier-curve"></i></button>
                                         </div>
                                         {selectedPointIndex !== -1 && selectedPoint && shape &&
                                             (

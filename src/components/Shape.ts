@@ -1,4 +1,8 @@
 
+export type Vec2 = {
+    x: number;
+    y: number;
+}
 export type Rect = {
     x: number;
     y: number;
@@ -24,6 +28,8 @@ export type Shape = {
 export type Point = {
     x: number;
     y: number;
+    in?: Vec2;
+    out?: Vec2;
 }
 
 export function CreateEmptyPath(): Path {
@@ -91,7 +97,15 @@ export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
 
         ctx.moveTo(points[0].x, points[0].y);
         for (let i = 1; i < points.length; i++) {
-            ctx.lineTo(points[i].x, points[i].y);
+            const prev = points[i - 1];
+            const curr = points[i];
+            ctx.bezierCurveTo(
+                prev.out?.x ?? prev.x,
+                prev.out?.y ?? prev.y,
+                curr.in?.x ?? curr.x,
+                curr.in?.y ?? curr.y,
+                curr.x, curr.y
+            );
         }
 
         if (shape.cyclic) ctx.closePath();
