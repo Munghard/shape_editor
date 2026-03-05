@@ -14,7 +14,7 @@ export const RECENTFILESKEY = "recentFiles";
 
 export default function Main() {
 
-
+    const [loaded, setLoaded] = useState(false);
     // HISTORY
     const [history, setHistory] = useState<History>({
         past: [],
@@ -73,6 +73,23 @@ export default function Main() {
     // DRAG
     const [dragging, setDragging] = useState<boolean>(false);
     const dragOffset = useRef({ x: 0, y: 0 });
+
+    // Session LOADING
+    useEffect(() => {
+        const saved = localStorage.getItem("Session");
+        if (saved) {
+            setHistory(JSON.parse(saved) as History);
+        }
+        setLoaded(true);
+    }, []);
+
+    // Session SAVING
+    useEffect(() => {
+        if (!loaded) return;
+        var json = JSON.stringify(history);
+        localStorage.setItem("Session", json);
+
+    }, [history, loaded]);
 
     // RECENT FILES
     useEffect(() => {
@@ -337,7 +354,6 @@ export default function Main() {
             Draw();
         }
         if (tool === "Scale" && dragging && lastMouseRef.current) {
-            console.log("scaling before shape");
 
             // const dx = screenX - lastMouseRef.current.x;
             const dy = screenY - lastMouseRef.current.y;
@@ -357,7 +373,6 @@ export default function Main() {
                     p.y = center.y + (p.y - center.y) * scaleFactor;
                 });
             });
-            console.log("scaling");
             Draw();
         }
         else if (tool === "Pan" && dragging && lastMouseRef.current) {

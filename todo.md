@@ -18,6 +18,7 @@ DONE
 
 TODO
 - [ ] make some kind of frame for exporting, can be in the file panel just a x,y value that you set and then theres an overlay on canvas
+- [ ] export to svg, maybe other formats too
 - [ ] session save
 - [ ] center camera button
 - [ ] Multi shape select
