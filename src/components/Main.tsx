@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react"
 import { ClearCanvas, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
-import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare } from "./Shape";
+import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect } from "./Shape";
 import getHoveredSegment from "./Segment";
 import { type SaveData } from "./SaveData";
 import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
 import type { History } from "./History";
 
-type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan";
+type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
 export const MAX_RECENT = 5;
 export const RECENTFILESKEY = "recentFiles";
@@ -24,6 +24,7 @@ export default function Main() {
 
     // FILE
     const [fileName, setFileName] = useState<string>("NewFile");
+    const [frame, setFrame] = useState<Rect>({ x: 0, y: 0, w: 500, h: 500 });
 
     // CANVAS
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -120,7 +121,9 @@ export default function Main() {
         const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 
         ClearCanvas(ctx);
-        history.present.shapes.forEach(shape => DrawShape(ctx, shape, cameraRef.current));
+
+        ctx.setTransform(cameraRef.current.zoom, 0, 0, cameraRef.current.zoom, -cameraRef.current.x * cameraRef.current.zoom, -cameraRef.current.y * cameraRef.current.zoom)
+        history.present.shapes.forEach(shape => DrawShape(ctx, shape));
     }
 
     // DRAW GRID
@@ -175,6 +178,10 @@ export default function Main() {
                 setTool("Select");
                 e.preventDefault();
             }
+            if (e.key === "f") {
+                setTool("Frame");
+                e.preventDefault();
+            }
             if (e.key === "s") {
                 setTool("Scale");
                 e.preventDefault();
@@ -183,7 +190,7 @@ export default function Main() {
                 setTool("Rotate");
                 e.preventDefault();
             }
-            if (e.key === "Control") {
+            if (e.key === "a") {
                 setTool("Move");
                 e.preventDefault();
             }
@@ -191,11 +198,11 @@ export default function Main() {
                 setTool("Pan");
                 e.preventDefault();
             }
-            if (e.key === "Shift") {
+            if (e.key === "w") {
                 setTool("Insert");
                 e.preventDefault();
             }
-            if (e.key === "Alt") {
+            if (e.key === "d") {
                 setTool("Delete");
                 e.preventDefault();
             }
@@ -203,19 +210,7 @@ export default function Main() {
         }
 
         function handleKeyUp(e: globalThis.KeyboardEvent): void {
-            if (e.key === "Control") {
-                setTool("Select");
-                e.preventDefault();
-            }
             if (e.code === "Space") {
-                setTool("Select");
-                e.preventDefault();
-            }
-            if (e.key === "Shift") {
-                setTool("Select");
-                e.preventDefault();
-            }
-            if (e.key === "Alt") {
                 setTool("Select");
                 e.preventDefault();
             }
@@ -375,6 +370,30 @@ export default function Main() {
             });
             Draw();
         }
+        else if (tool === "Frame" && dragging && lastMouseRef.current) {
+            if (!lastMouseRef.current) return
+
+            // delta in screen pixels
+            const dx = (screenX - lastMouseRef.current.x) / cameraRef.current.zoom;
+            const dy = (screenY - lastMouseRef.current.y) / cameraRef.current.zoom;
+
+            // convert to world units by dividing by zoom once
+            if (e.ctrlKey) {
+                setFrame(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+            }
+            else if (e.shiftKey) {
+                setFrame(prev => ({ ...prev, w: prev.h + dy, h: prev.h + dy }));
+            }
+            else {
+                setFrame(prev => ({ ...prev, w: prev.w + dx, h: prev.h + dy }));
+            }
+
+            lastMouseRef.current = { x: screenX, y: screenY }
+
+            // Draw()
+            // ReDrawGrid();
+            // console.log(cameraRef.current.x, cameraRef.current.y)
+        }
         else if (tool === "Pan" && dragging && lastMouseRef.current) {
             if (!lastMouseRef.current) return
 
@@ -491,7 +510,7 @@ export default function Main() {
         const screenY = cmp.y;
         var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
 
-        if (tool === "Pan" || tool === "Scale" || tool === "Rotate") {
+        if (tool === "Pan" || tool === "Scale" || tool === "Rotate" || tool === "Frame") {
             lastMouseRef.current = { x: screenX, y: screenY }
         }
         if (tool === "Select" || tool === "Move") {
@@ -815,7 +834,8 @@ export default function Main() {
         const ctx = tempCanvas.getContext("2d");
         if (!ctx) return;
 
-        ExportShape(ctx, cameraRef.current, selectedExportScale, fileName, history.present.shapes);
+
+        ExportShape(selectedExportScale, fileName, history.present.shapes, frame, canvasRef.current);
     }
     function handleSave(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         SaveFile(fileName, history.present.shapes, showGrid, snapToGrid, gridSubdivions);
@@ -994,12 +1014,13 @@ export default function Main() {
                     <div className="flex flex-col gap-2">
                         <h2>Tools</h2>
                         <button className={`${tool === "Select" ? "selected" : ""} `} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
-                        <button className={`${tool === "Insert" ? "selected" : ""} `} onClick={() => setTool("Insert")} title="Insert(Shift)"><i className="fa-solid fa-pencil"></i></button>
-                        <button className={`${tool === "Move" ? "selected" : ""} `} onClick={() => setTool("Move")} title="Move(Ctrl)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                        <button className={`${tool === "Insert" ? "selected" : ""} `} onClick={() => setTool("Insert")} title="Insert(W)"><i className="fa-solid fa-pencil"></i></button>
+                        <button className={`${tool === "Move" ? "selected" : ""} `} onClick={() => setTool("Move")} title="Move(A)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
                         <button className={`${tool === "Rotate" ? "selected" : ""} `} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
                         <button className={`${tool === "Scale" ? "selected" : ""} `} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-                        <button className={`${tool === "Delete" ? "selected" : ""} `} onClick={() => setTool("Delete")} title="Delete(Alt)"><i className="fa-solid fa-eraser"></i></button>
+                        <button className={`${tool === "Delete" ? "selected" : ""} `} onClick={() => setTool("Delete")} title="Delete(D)"><i className="fa-solid fa-eraser"></i></button>
                         <button className={`${tool === "Pan" ? "selected" : ""} `} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
+                        <button className={`${tool === "Frame" ? "selected" : ""} `} onClick={() => setTool("Frame")} title="Frame(F)"><i className="fa-solid fa-crop-simple"></i></button>
                     </div>
                 </div>
                 {/* shaped and paths */}
@@ -1035,8 +1056,8 @@ export default function Main() {
                             <h1 className='mb-10 text-zinc-400 flex text-center'>LIGMA - {fileName}</h1>
                         </div>
                     </div>
-                    {/* Knobs */}
-                    <div className="flex flex-col gap-4 flex-1 overflow-hidden">
+                    <div id="canvas-container" className="flex flex-col gap-4 flex-1 overflow-hidden">
+                        {/* Knobs */}
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
 
                             {showKnobs && !dragging &&
@@ -1082,9 +1103,30 @@ export default function Main() {
                                 })
                             }
 
+                            {/* Export frame */}
+                            {tool === "Frame" && canvasRef.current && canvasRef.current &&
+                                (() => {
+                                    const rect = canvasRef.current.getBoundingClientRect();
+                                    const pos = worldToScreen(frame.x + rect.x, frame.y + rect.y, cameraRef.current, canvasRef.current);
+
+                                    return (
+                                        <div
+                                            style={{ left: pos.x, top: pos.y, width: frame.w * cameraRef.current.zoom, height: frame.h * cameraRef.current.zoom, boxShadow: "0 0 0 10000px rgba(0,0,0,0.4)" }}
+                                            className="absolute pointer-events-none z-30 border border-white overflow-visible"
+                                        >
+                                            <div className="flex flex-col -translate-y-24 absolute ">
+                                                <p>W: {frame.w.toFixed(1)},H: {frame.h.toFixed(1)}</p>
+                                                <p>drag to scale</p>
+                                                <p>ctrl drag to move</p>
+                                                <p>shift drag to scale uniform</p>
+                                            </div>
+                                        </div>
+
+                                    );
+                                })()
+                            }
+
                             {/* Canvas */}
-
-
                             <canvas
                                 id="CanvasOverlay"
                                 className="absolute inset-0 pointer-events-none z-20"
@@ -1367,6 +1409,18 @@ export default function Main() {
                                 <button title="Load" onClick={handleLoad}><i className="fa-solid fa-folder"></i></button>
                                 <button title="New" onClick={() => { commit(() => [CreateBaseShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
                             </div>
+                            <div className="flex flex-col gap-2">
+                                <h2>Export frame</h2>
+                                <div className="flex flex-row gap-2">
+                                    <label>X:</label><input className="w-20" type="number" value={frame.x} onChange={(e) => setFrame(prev => ({ ...prev, x: Number(e.target.value) }))}></input>
+                                    <label>Y:</label><input className="w-20" type="number" value={frame.y} onChange={(e) => setFrame(prev => ({ ...prev, y: Number(e.target.value) }))}></input>
+                                </div>
+                                <div className="flex flex-row gap-2">
+                                    <label>W:</label><input className="w-20" type="number" value={frame.w} onChange={(e) => setFrame(prev => ({ ...prev, w: Number(e.target.value) }))}></input>
+                                    <label>H:</label><input className="w-20" type="number" value={frame.h} onChange={(e) => setFrame(prev => ({ ...prev, h: Number(e.target.value) }))}></input>
+                                </div>
+                            </div>
+                            <h2>Recent files</h2>
                             <div className="flex flex-col gap-2">
                                 {recentFiles.map((file, index) =>
                                     <div className="flex flex-row gap-2" key={index}>

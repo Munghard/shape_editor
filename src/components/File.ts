@@ -1,27 +1,58 @@
-import type { Camera } from "./Camera";
+
 import { MAX_RECENT, RECENTFILESKEY } from "./Main";
 import type { SaveData } from "./SaveData";
-import { DrawShape, type Shape } from "./Shape";
+import { DrawShape, type Rect, type Shape } from "./Shape";
 
 
 
 
-export function ExportShape(ctx: CanvasRenderingContext2D, cameraRef: Camera, selectedExportScale: string, fileName: string, shapes: Shape[]): void {
+export function ExportShape(
+    selectedExportScale: string,
+    fileName: string,
+    shapes: Shape[],
+    frame: Rect,
+    canvas: HTMLCanvasElement,
+): void {
+    const scale = Number(selectedExportScale);
 
-    // scale context
-    ctx.scale(Number(selectedExportScale), Number(selectedExportScale));
+    const rect = canvas.getBoundingClientRect();
+    const canvasOffsetX = rect.x;
+    const canvasOffsetY = rect.y;
 
-    // draw shapes onto temp canvas
-    shapes.forEach(shape => DrawShape(ctx, shape, cameraRef)); // adjust DrawShape to accept ctx
+    // 1. Create canvas at the final output size
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = frame.w * scale;
+    tempCanvas.height = frame.h * scale;
 
-    // Export
-    const dataUrl = ctx.canvas.toDataURL("image/png");
+    const ctx = tempCanvas.getContext("2d");
+    if (!ctx) return;
+
+    // 2. Clear and reset transformations
+    ctx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+    ctx.save();
+
+    // 3. Apply Export Scale
+    ctx.scale(scale, scale);
+
+    // 4. Translate the context so that the Frame's Top-Left (x, y) 
+    // becomes the Canvas's (0, 0)
+    ctx.translate(-frame.x - canvasOffsetX, -frame.y - canvasOffsetY);
+
+    // 5. Draw shapes in their original global coordinates
+    // We no longer need to manually map/offset every point in the shapes!
+    shapes.forEach(shape => {
+        DrawShape(ctx, shape);
+    });
+
+    ctx.restore();
+
+    // 6. Export
+    const dataUrl = tempCanvas.toDataURL("image/png");
     const link = document.createElement("a");
     link.href = dataUrl;
-    link.download = fileName + ".png"
+    link.download = `${fileName}.png`;
     link.click();
 }
-
 export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, snapGrid: boolean, gridSubd: number): void {
     const saveData: SaveData = {
         id: crypto.randomUUID(),
