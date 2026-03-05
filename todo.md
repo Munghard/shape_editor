@@ -16,9 +16,10 @@ DONE
 - [x] add shapes to a panel where you can select them
 - [x] snap to grid is now broken, different grid drawing in drawgrid
 - [x] session save
+- [x] make some kind of frame for exporting, can be in the file panel just a x,y value that you set and then theres an overlay on canvas
+- [x] move all shapes
 
 TODO
-- [ ] make some kind of frame for exporting, can be in the file panel just a x,y value that you set and then theres an overlay on canvas
 - [ ] export to svg, maybe other formats too
 - [ ] center camera button
 - [ ] Multi shape select

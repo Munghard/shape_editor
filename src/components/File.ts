@@ -11,13 +11,9 @@ export function ExportShape(
     fileName: string,
     shapes: Shape[],
     frame: Rect,
-    canvas: HTMLCanvasElement,
 ): void {
     const scale = Number(selectedExportScale);
 
-    const rect = canvas.getBoundingClientRect();
-    const canvasOffsetX = rect.x;
-    const canvasOffsetY = rect.y;
 
     // 1. Create canvas at the final output size
     const tempCanvas = document.createElement("canvas");
@@ -36,7 +32,7 @@ export function ExportShape(
 
     // 4. Translate the context so that the Frame's Top-Left (x, y) 
     // becomes the Canvas's (0, 0)
-    ctx.translate(-frame.x - canvasOffsetX, -frame.y - canvasOffsetY);
+    ctx.translate(-frame.x, -frame.y);
 
     // 5. Draw shapes in their original global coordinates
     // We no longer need to manually map/offset every point in the shapes!
