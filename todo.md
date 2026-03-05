@@ -15,11 +15,11 @@ DONE
 - [x] rotate shape tool
 - [x] add shapes to a panel where you can select them
 - [x] snap to grid is now broken, different grid drawing in drawgrid
+- [x] session save
 
 TODO
 - [ ] make some kind of frame for exporting, can be in the file panel just a x,y value that you set and then theres an overlay on canvas
 - [ ] export to svg, maybe other formats too
-- [ ] session save
 - [ ] center camera button
 - [ ] Multi shape select
 - [ ] opacity to stroke and fill

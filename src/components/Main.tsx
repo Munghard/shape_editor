@@ -993,13 +993,13 @@ export default function Main() {
                 <div id="TOOLS" className="panel  overflow-auto h-screen">
                     <div className="flex flex-col gap-2">
                         <h2>Tools</h2>
-                        <button className={`${tool === "Select" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
-                        <button className={`${tool === "Insert" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Insert")} title="Insert(Shift)"><i className="fa-solid fa-pencil"></i></button>
-                        <button className={`${tool === "Move" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Move")} title="Move(Ctrl)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
-                        <button className={`${tool === "Rotate" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
-                        <button className={`${tool === "Scale" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-                        <button className={`${tool === "Delete" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Delete")} title="Delete(Alt)"><i className="fa-solid fa-eraser"></i></button>
-                        <button className={`${tool === "Pan" ? "bg-zinc-600!" : "bg-zinc-900!"} border-2!`} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
+                        <button className={`${tool === "Select" ? "selected" : ""} `} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
+                        <button className={`${tool === "Insert" ? "selected" : ""} `} onClick={() => setTool("Insert")} title="Insert(Shift)"><i className="fa-solid fa-pencil"></i></button>
+                        <button className={`${tool === "Move" ? "selected" : ""} `} onClick={() => setTool("Move")} title="Move(Ctrl)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                        <button className={`${tool === "Rotate" ? "selected" : ""} `} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
+                        <button className={`${tool === "Scale" ? "selected" : ""} `} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+                        <button className={`${tool === "Delete" ? "selected" : ""} `} onClick={() => setTool("Delete")} title="Delete(Alt)"><i className="fa-solid fa-eraser"></i></button>
+                        <button className={`${tool === "Pan" ? "selected" : ""} `} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
                     </div>
                 </div>
                 {/* shaped and paths */}
@@ -1009,7 +1009,7 @@ export default function Main() {
                         {history.present && history.present.shapes.map((_s, i) => {
                             return (
                                 <div key={i} className="flex flex-row gap-2">
-                                    <button onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
+                                    <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
                                     <button onClick={() => DeleteShape(i)}>X</button>
                                 </div>
                             )
@@ -1019,7 +1019,7 @@ export default function Main() {
                         {shape && shape.paths.map((_s, i) => {
                             return (
                                 <div key={i} className="flex flex-row gap-2">
-                                    <button onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
+                                    <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
                                     <button onClick={() => DeletePath(i)}>X</button>
                                 </div>
                             )
