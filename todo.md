@@ -20,6 +20,7 @@ DONE
 - [x] move all shapes
 
 TODO
+- [ ] add hotkeys for delete selection, shape, point, path (delete) . duplicate (ctrl + D, alt + move)
 - [ ] preview shapes for live updating when moving curve handles
 - [ ] something wrong with grid rendering when you turn it off
 - [ ] colors panel, display all colors in file and allow changing 

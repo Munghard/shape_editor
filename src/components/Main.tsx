@@ -11,6 +11,7 @@ import { APP_NAME } from "../Constants";
 import { Knob } from "./Knob";
 import { Handle } from "./Handle";
 import { DrawHandleLines } from "./OverlayCanvas";
+import type { Camera } from "./Camera";
 
 export type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
@@ -39,16 +40,25 @@ export default function Main() {
 
     //SHAPE
     const [hiddenShapeIndicies, setHiddenShapeIndicies] = useState<number[]>([]);
-    const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(0);
+    const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(-1);
 
     const shape = history.present.shapes[selectedShapeIndex];
 
     // PATH
-    const [selectedPathIndex, setSelectedPathIndex] = useState<number>(0);
+    const [selectedPathIndex, setSelectedPathIndex] = useState<number>(-1);
     // const [hiddenPathIndicies, setHiddenPathIndicies] = useState<number[]>([]);
+
     // POINT
     const [selectedPointIndex, setSelectedPointIndex] = useState<number>(-1);
-    const [selectedPoint, setSelectedPoint] = useState<Point | null>(null)
+    // auto updating selectedpoint logic
+    const selectedPoint =
+        selectedShapeIndex !== -1 &&
+            selectedPathIndex !== -1 &&
+            selectedPointIndex !== -1
+            ? history.present.shapes[selectedShapeIndex]
+                ?.paths[selectedPathIndex]
+                ?.points[selectedPointIndex]
+            : null;
 
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
@@ -93,8 +103,22 @@ export default function Main() {
     // Session LOADING
     useEffect(() => {
         const saved = localStorage.getItem("Session");
-        if (saved) {
-            setHistory(JSON.parse(saved) as History);
+        if (!saved) return;
+        try {
+
+            const data = JSON.parse(saved) as {
+                history: History;
+                frame: Rect;
+                tool: Tool;
+            };
+            // Extract each piece
+            if (data.history) setHistory(data.history);
+            if (data.frame) setFrame(data.frame);
+            if (data.tool) setTool(data.tool);
+
+
+        } catch (error) {
+            console.warn("Failed to load session");
         }
         setLoaded(true);
     }, []);
@@ -102,10 +126,11 @@ export default function Main() {
     // Session SAVING
     useEffect(() => {
         if (!loaded) return;
-        var json = JSON.stringify(history);
+        const SaveData = { history, frame, tool }
+        var json = JSON.stringify(SaveData);
         localStorage.setItem("Session", json);
 
-    }, [history, loaded]);
+    }, [history, loaded, frame, tool]);
 
     // RECENT FILES
     useEffect(() => {
@@ -163,20 +188,19 @@ export default function Main() {
         }
     }, [showGrid, gridSubdivions, gridAlpha, gridColor]);
 
-
-    // SELECTED POINT
+    // ON SELECTED SHAPE CHANGED SET PATHINDEX TO 0 AND POINT INDEX TO "NULL" ELSE CRASH
     useEffect(() => {
-        if (!shape) {
-            setSelectedPoint(null);
-            return;
+        if (selectedShapeIndex !== -1) {
+            setSelectedPathIndex(0);
+            setSelectedPointIndex(-1);
         }
-        const points = shape.paths[selectedPathIndex].points;
-        if (!points || selectedPointIndex === null || selectedPointIndex < 0 || selectedPointIndex >= points.length) {
-            setSelectedPoint(null);
-        } else {
-            setSelectedPoint(points[selectedPointIndex]);
+        else {
+
+            setSelectedPathIndex(-1);
+            setSelectedPointIndex(-1);
         }
-    }, [shape, selectedPathIndex, selectedPointIndex]);
+    }, [selectedShapeIndex]);
+
 
 
 
@@ -190,48 +214,46 @@ export default function Main() {
             }
 
             const key = e.key.toLowerCase();
-
-            if (e.ctrlKey && !e.shiftKey && key === "z") {
-                undo();
+            // 1️⃣ Special keys
+            if (key === "delete") {
+                if (selectedShapeIndex !== -1) {
+                    DeleteShape(selectedShapeIndex);
+                }
                 e.preventDefault();
-            }
-            if (e.ctrlKey && e.shiftKey && key === "z") {
-                redo();
-                e.preventDefault();
-            }
-            if (e.key === "q") {
-                setTool("Select");
-                e.preventDefault();
-            }
-            if (e.key === "f") {
-                setTool("Frame");
-                e.preventDefault();
-            }
-            if (e.key === "s") {
-                setTool("Scale");
-                e.preventDefault();
-            }
-            if (e.key === "r") {
-                setTool("Rotate");
-                e.preventDefault();
-            }
-            if (e.key === "a") {
-                setTool("Move");
-                e.preventDefault();
+                return;
             }
             if (e.code === "Space") {
                 setTool("Pan");
                 e.preventDefault();
-            }
-            if (e.key === "w") {
-                setTool("Insert");
-                e.preventDefault();
-            }
-            if (e.key === "d") {
-                setTool("Delete");
-                e.preventDefault();
+                return;
             }
 
+            // 2️⃣ Modifiers
+            if (e.ctrlKey && !e.shiftKey && key === "z") {
+                undo();
+                e.preventDefault();
+                return;
+            }
+            if (e.ctrlKey && e.shiftKey && key === "z") {
+                redo();
+                e.preventDefault();
+                return;
+            }
+            if (e.ctrlKey && key === "d") {
+                if (shape) AddNewShape("", CloneShape(shape));
+                e.preventDefault();
+                return;
+            }
+
+            // 3️⃣ Single keys
+            switch (key) {
+                case "q": setTool("Select"); break;
+                case "f": setTool("Frame"); break;
+                case "s": setTool("Scale"); break;
+                case "r": setTool("Rotate"); break;
+                case "a": setTool("Move"); break;
+                case "w": setTool("Insert"); break;
+            }
         }
 
         function handleKeyUp(e: globalThis.KeyboardEvent): void {
@@ -247,7 +269,7 @@ export default function Main() {
             window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener("keyup", handleKeyUp);
         }
-    }, []);
+    }, [shape, selectedShapeIndex]);
 
 
     // RESIZE CANVASES ON CHANGE
@@ -771,6 +793,7 @@ export default function Main() {
 
         const screenX = cmp.x;
         const screenY = cmp.y;
+
         var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
 
         if (tool === "Pan" || tool === "Scale" || tool === "Rotate" || tool === "Frame") {
@@ -1027,12 +1050,13 @@ export default function Main() {
         if (shape && shape.paths[selectedPathIndex].points.length > index && index > -1) {
 
             setSelectedPointIndex(index)
-            setSelectedPoint(shape.paths[selectedPathIndex].points[index]);
         }
     }
 
     function startDragging(index: number) {
         if (!canvasRef.current) return;
+
+        if (selectedShapeIndex === -1 || selectedPathIndex === -1) return;
 
         const shape = history.present.shapes[selectedShapeIndex];
         const path = shape.paths[selectedPathIndex];
@@ -1185,7 +1209,7 @@ export default function Main() {
         return newShape;
     }
 
-    function DeleteSelectedShape(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
+    function DeleteSelectedShape(): void {
         if (selectedShapeIndex === -1) return;
         commit(prev => [...prev.filter(s => s !== shape)]);
         setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
@@ -1410,7 +1434,8 @@ export default function Main() {
                     </div>
                     <div id="canvas-container" className="flex flex-col gap-4 flex-1  overflow-hidden">
                         {/* Tooltip */}
-                        <p className="absolute w-50% z-40 p-10 text-zinc-500">Tooltip: {toolTooltip(tool)}</p>
+                        <p className="absolute w-50% z-40 p-10 text-zinc-500 pointer-events-none">Tooltip: {toolTooltip(tool)}</p>
+
 
                         {/* Knobs */}
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
