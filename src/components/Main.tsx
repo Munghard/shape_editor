@@ -1678,25 +1678,50 @@ export default function Main() {
                             </>}
                             <div className="panel2">
                                 <h2 className="panel2header">Colors</h2>
-                                <div className="panel2content">
-                                    {Array.from(
-                                        new Set(history.present.shapes.map(shape => shape.fillColor))
-                                    ).map((color, i) => (
-                                        <input
-                                            key={i}
-                                            className="colorSelect"
-                                            type="color"
-                                            value={color}
-                                            onChange={(e) => {
-                                                const newColor = e.target.value;
-                                                commit(prevShapes =>
-                                                    prevShapes.map(s =>
-                                                        s.fillColor === color ? { ...s, fillColor: newColor } : s
-                                                    )
-                                                );
-                                            }}
-                                        />
-                                    ))}
+                                <div className="panel2content flex-row!">
+                                    <div className="flex flex-col">
+
+                                        <h2>Fill</h2>
+                                        {Array.from(
+                                            new Set(history.present.shapes.map(shape => shape.fillColor))
+                                        ).map((color, i) => (
+                                            <input
+                                                key={i}
+                                                className="colorSelect"
+                                                type="color"
+                                                value={color}
+                                                onChange={(e) => {
+                                                    const newColor = e.target.value;
+                                                    commit(prevShapes =>
+                                                        prevShapes.map(s =>
+                                                            s.fillColor === color ? { ...s, fillColor: newColor } : s
+                                                        )
+                                                    );
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h2>Stroke</h2>
+                                        {Array.from(
+                                            new Set(history.present.shapes.map(shape => shape.strokeColor))
+                                        ).map((color, i) => (
+                                            <input
+                                                key={i}
+                                                className="colorSelect"
+                                                type="color"
+                                                value={color}
+                                                onChange={(e) => {
+                                                    const newColor = e.target.value;
+                                                    commit(prevShapes =>
+                                                        prevShapes.map(s =>
+                                                            s.strokeColor === color ? { ...s, strokeColor: newColor } : s
+                                                        )
+                                                    );
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
 
