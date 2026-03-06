@@ -20,6 +20,7 @@ DONE
 - [x] move all shapes
 
 TODO
+- [ ] preview shapes for live updating when moving curve handles
 - [ ] something wrong with grid rendering when you turn it off
 - [ ] colors panel, display all colors in file and allow changing 
 - [ ] export to svg, maybe other formats too

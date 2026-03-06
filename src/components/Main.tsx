@@ -273,7 +273,7 @@ export default function Main() {
             observer.disconnect();
             window.removeEventListener("resize", resizeHandler);
         };
-    }, []);
+    }, [canvasRef.current]);
 
     useEffect(() => {
 
@@ -281,6 +281,7 @@ export default function Main() {
             cameraRef.current.x = -canvasRef.current.width / 2;
             cameraRef.current.y = -canvasRef.current.height / 2;
         }
+
     }, [canvasRef.current]);
 
     function ReDrawGrid() {
@@ -1420,7 +1421,7 @@ export default function Main() {
                                     const inScreen = p.in && worldToScreen(p.in.x, p.in.y, cameraRef.current, canvasRef.current);
                                     const outScreen = p.out && worldToScreen(p.out.x, p.out.y, cameraRef.current, canvasRef.current);
                                     return (
-                                        <>
+                                        <div key={i}>
                                             <Knob x={pointScreen.x} y={pointScreen.y} i={i} selected={selected} size={knobSize} tool={tool} handleKnobMouseDown={handleKnobMouseDown}></Knob>
 
                                             {
@@ -1431,7 +1432,7 @@ export default function Main() {
                                                 outScreen && selected &&
                                                 <Handle x={outScreen.x} y={outScreen.y} handleIn={false} i={i} size={knobSize} startHandleDrag={startHandleDrag}></Handle>
                                             }
-                                        </>
+                                        </div>
                                     )
                                 })
                             }
