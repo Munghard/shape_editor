@@ -1,5 +1,5 @@
 import type { Camera } from "../components/Camera";
-import type { Point, Shape } from "../components/Shape";
+import type { Point, Shape, Vec2 } from "../components/Shape";
 
 
 export function lerp(a: number, b: number, t: number): number {
@@ -92,7 +92,19 @@ export function CloneShape(shape: Shape): Shape {
         ...shape,
         paths: shape.paths.map(path => ({
             ...path,
-            points: path.points.map(p => ({ ...p }))
+            points: path.points.map(p => ({
+                x: p.x,
+                y: p.y,
+                in: p.in ? { x: p.in.x, y: p.in.y } : undefined,
+                out: p.out ? { x: p.out.x, y: p.out.y } : undefined
+            }))
         }))
+    };
+}
+export function cubicBezierPoint(t: number, p0: Vec2, c1: Vec2, c2: Vec2, p3: Vec2): Vec2 {
+    const u = 1 - t;
+    return {
+        x: u * u * u * p0.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * p3.x,
+        y: u * u * u * p0.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * p3.y
     };
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { ClearCanvas, CloneShape, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
+import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getRandomColor, getShapeCenter, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
 import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect } from "./Shape";
 import getHoveredSegment from "./Segment";
@@ -10,6 +10,7 @@ import { toolTooltip } from "./ToolTooltips";
 import { APP_NAME } from "../Constants";
 import { Knob } from "./Knob";
 import { Handle } from "./Handle";
+import { DrawHandleLines } from "./OverlayCanvas";
 
 export type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
@@ -78,6 +79,7 @@ export default function Main() {
     const [recentFiles, setRecentFiles] = useState<SaveData[]>([]);
 
     const draggingRef = useRef<{ index: number, handleIn: boolean } | null>(null);
+    const dragDeltaRef = useRef<{ index: number; handleIn: boolean; dx: number; dy: number } | null>(null);
 
     const [tool, setTool] = useState<Tool>("Select");
 
@@ -124,7 +126,7 @@ export default function Main() {
         const rect = canvas.getBoundingClientRect();
         setCanvasRect(rect);
 
-    }, [history.present.shapes, knobSize, hiddenShapeIndicies]);
+    }, [history.present.shapes, knobSize, hiddenShapeIndicies, selectedPoint]);
 
     function Draw() {
 
@@ -137,6 +139,16 @@ export default function Main() {
 
         ctx.setTransform(cameraRef.current.zoom, 0, 0, cameraRef.current.zoom, -cameraRef.current.x * cameraRef.current.zoom, -cameraRef.current.y * cameraRef.current.zoom)
         history.present.shapes.forEach((shape, i) => { if (!hiddenShapeIndicies.includes(i)) DrawShape(ctx, shape) });
+
+        const coCanvas = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
+        const coctx = coCanvas.getContext("2d") as CanvasRenderingContext2D;
+        if (selectedPoint) {
+            ClearCanvas(coctx);
+            DrawHandleLines(coctx, selectedPoint, cameraRef.current, coCanvas)
+        }
+        else {
+            ClearCanvas(coctx);
+        }
     }
 
     // DRAW GRID
@@ -158,7 +170,7 @@ export default function Main() {
             setSelectedPoint(null);
             return;
         }
-        const points = shape.paths[selectedPathIndex]?.points;
+        const points = shape.paths[selectedPathIndex].points;
         if (!points || selectedPointIndex === null || selectedPointIndex < 0 || selectedPointIndex >= points.length) {
             setSelectedPoint(null);
         } else {
@@ -364,6 +376,76 @@ export default function Main() {
         });
     }
 
+    // ================================================================================================================
+    // MOVE 
+    // ================================================================================================================
+    function MovePoint(p: Point, dx: number, dy: number) {
+        p.x += dx;
+        p.y += dy;
+
+        if (p.in) {
+            p.in.x += dx;
+            p.in.y += dy;
+        }
+
+        if (p.out) {
+            p.out.x += dx;
+            p.out.y += dy;
+        }
+    }
+    // ================================================================================================================
+    // ROTATE
+    // ================================================================================================================
+    function RotatePoint(p: Point, center: { x: number; y: number; }, cos: number, sin: number) {
+        const offsetX = p.x - center.x;
+        const offsetY = p.y - center.y;
+
+        // apply rotation
+        const rotatedX = offsetX * cos - offsetY * sin;
+        const rotatedY = offsetX * sin + offsetY * cos;
+
+        p.x = center.x + rotatedX;
+        p.y = center.y + rotatedY;
+
+        if (p.in) {
+            const inOffsetX = p.in.x - center.x;
+            const inOffsetY = p.in.y - center.y;
+
+            // apply rotation
+            const rotatedInX = inOffsetX * cos - inOffsetY * sin;
+            const rotatedInY = inOffsetX * sin + inOffsetY * cos;
+
+            p.in.x = center.x + rotatedInX;
+            p.in.y = center.y + rotatedInY;
+        }
+        if (p.out) {
+            const outOffsetX = p.out.x - center.x;
+            const outOffsetY = p.out.y - center.y;
+
+            // apply rotation
+            const rotatedOutX = outOffsetX * cos - outOffsetY * sin;
+            const rotatedOutY = outOffsetX * sin + outOffsetY * cos;
+
+            p.out.x = center.x + rotatedOutX;
+            p.out.y = center.y + rotatedOutY;
+        }
+    }
+    // ================================================================================================================
+    // SCALE
+    // ================================================================================================================
+    function ScalePoint(p: Point, center: { x: number; y: number }, scaleFactor: number) {
+        p.x = center.x + (p.x - center.x) * scaleFactor;
+        p.y = center.y + (p.y - center.y) * scaleFactor;
+        if (p.in) {
+            p.in.x = center.x + (p.in.x - center.x) * scaleFactor;
+            p.in.y = center.y + (p.in.y - center.y) * scaleFactor;
+        }
+        if (p.out) {
+            p.out.x = center.x + (p.out.x - center.x) * scaleFactor;
+            p.out.y = center.y + (p.out.y - center.y) * scaleFactor;
+        }
+    }
+
     function handleMouseMove(e: React.DragEvent<HTMLCanvasElement>) {
 
         if (!canvasRef.current) return;
@@ -373,7 +455,40 @@ export default function Main() {
         let screenX = cmp.x;
         let screenY = cmp.y;
 
-        if (tool === "Rotate" && dragging && lastMouseRef.current) {
+        if (tool === "Move") {
+            // return if no shape selected
+            if (!shape) return;
+            // move all points in paths in shape
+            if (dragging) {
+                const dx = (screenX - dragOffset.current.x) / cameraRef.current.zoom;
+                const dy = (screenY - dragOffset.current.y) / cameraRef.current.zoom;
+
+                const shape = history.present.shapes[selectedShapeIndex];
+                const shapes = history.present.shapes;
+
+                if (e.ctrlKey) {
+                    shapes.forEach(shape => {
+                        shape.paths.forEach(path => {
+                            path.points.forEach(p => {
+                                MovePoint(p, dx, dy);
+                            });
+                        });
+                    });
+                }
+                else {
+                    shape.paths.forEach(path => {
+                        path.points.forEach(p => {
+                            MovePoint(p, dx, dy);
+                        });
+                    });
+                }
+
+                dragOffset.current = { x: screenX, y: screenY };
+                Draw();
+                ReDrawGrid();
+            }
+        }
+        else if (tool === "Rotate" && dragging && lastMouseRef.current) {
 
             // const dx = screenX - lastMouseRef.current.x;
             const dy = screenY - lastMouseRef.current.y;
@@ -389,38 +504,21 @@ export default function Main() {
             // Rotate based on vertical mouse delta (dy)
             // You can tweak the factor to control sensitivity
             const angle = dy * 0.01; // radians
+            const sin = Math.sin(angle);
+            const cos = Math.cos(angle);
             if (e.ctrlKey) {
                 shapes.forEach(shape => {
                     shape.paths.forEach(path => {
                         path.points.forEach(p => {
-                            const offsetX = p.x - center.x;
-                            const offsetY = p.y - center.y;
-
-                            // apply rotation
-                            const rotatedX = offsetX * Math.cos(angle) - offsetY * Math.sin(angle);
-                            const rotatedY = offsetX * Math.sin(angle) + offsetY * Math.cos(angle);
-
-                            p.x = center.x + rotatedX;
-                            p.y = center.y + rotatedY;
+                            RotatePoint(p, center, cos, sin);
                         });
                     });
                 });
             }
-
             else {
-
-
                 shape.paths.forEach(path => {
                     path.points.forEach(p => {
-                        const offsetX = p.x - center.x;
-                        const offsetY = p.y - center.y;
-
-                        // apply rotation
-                        const rotatedX = offsetX * Math.cos(angle) - offsetY * Math.sin(angle);
-                        const rotatedY = offsetX * Math.sin(angle) + offsetY * Math.cos(angle);
-
-                        p.x = center.x + rotatedX;
-                        p.y = center.y + rotatedY;
+                        RotatePoint(p, center, cos, sin);
                     });
                 });
             }
@@ -445,8 +543,7 @@ export default function Main() {
                 shapes.forEach(shape => {
                     shape.paths.forEach(path => {
                         path.points.forEach(p => {
-                            p.x = center.x + (p.x - center.x) * scaleFactor;
-                            p.y = center.y + (p.y - center.y) * scaleFactor;
+                            ScalePoint(p, center, scaleFactor);
                         });
                     });
                 });
@@ -455,8 +552,7 @@ export default function Main() {
 
                 shape.paths.forEach(path => {
                     path.points.forEach(p => {
-                        p.x = center.x + (p.x - center.x) * scaleFactor;
-                        p.y = center.y + (p.y - center.y) * scaleFactor;
+                        ScalePoint(p, center, scaleFactor);
                     });
                 });
             }
@@ -503,56 +599,6 @@ export default function Main() {
             ReDrawGrid();
             // console.log(cameraRef.current.x, cameraRef.current.y)
         }
-        else if (tool === "Move") {
-            // return if no shape selected
-            if (!shape) return;
-            // move all points in paths in shape
-            if (dragging) {
-                const dx = (screenX - dragOffset.current.x) / cameraRef.current.zoom;
-                const dy = (screenY - dragOffset.current.y) / cameraRef.current.zoom;
-
-                if (e.ctrlKey) {
-                    setHistory(prev => {
-                        const copy = prev.present.shapes.map(shape => ({
-                            ...shape,
-                            paths: shape.paths.map(path => ({
-                                ...path,
-                                points: path.points.map(pt => ({
-                                    x: pt.x + dx,
-                                    y: pt.y + dy
-                                }))
-                            }))
-                        }));
-
-                        return {
-                            ...prev,
-                            present: { shapes: copy },
-                        };
-                    });
-                }
-                else {
-                    setHistory(prev => {
-                        const copy = [...prev.present.shapes];
-                        const shape = { ...copy[selectedShapeIndex] };
-                        shape.paths = shape.paths.map(path => ({
-                            ...path,
-                            points: path.points.map(pt => ({ x: pt.x + dx, y: pt.y + dy }))
-                        }));
-                        copy[selectedShapeIndex] = shape;
-
-                        return {
-                            ...prev,
-                            present: { shapes: copy },
-                        };
-                    });
-                }
-
-                dragOffset.current = { x: screenX, y: screenY };
-                Draw();
-                ReDrawGrid();
-            }
-        }
-
         else if (tool === "Insert") {
 
             const threshold = 10; // pixels
@@ -577,7 +623,11 @@ export default function Main() {
                 const start = path.points[seg];
                 const end = path.points[(seg + 1) % n]; // loops back to first point if last
 
-                var pos = lerpVec2(start, end, 0.5);
+                const c1 = start.out ?? start;
+                const c2 = end.in ?? end;
+
+                var pos = cubicBezierPoint(0.5, start, c1, c2, end);
+
                 const { x, y } = worldToScreen(pos.x, pos.y, cameraRef.current, canvasRef.current);
                 ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                 ctx.beginPath();
@@ -590,6 +640,9 @@ export default function Main() {
             }
         }
     }
+    // ================================================================================================================
+    // POINT HANDLES  
+    // ================================================================================================================
     function startHandleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
         if (!canvasRef.current) return;
         lastMouseRef.current = getCanvasMousePos(e, canvasRef.current);
@@ -599,16 +652,14 @@ export default function Main() {
         e.preventDefault();
     }
 
+    // POINT HANDLES
     function onHandleMouseMove(e: MouseEvent) {
         if (!draggingRef.current) return;
         handleDrag(e as unknown as React.MouseEvent, draggingRef.current.index, draggingRef.current.handleIn);
     }
 
-    function stopHandleDrag() {
-        draggingRef.current = null;
-        window.removeEventListener("mousemove", onHandleMouseMove);
-        window.removeEventListener("mouseup", stopHandleDrag);
-    }
+
+    // POINT HANDLES
     function handleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
         if (!canvasRef.current || !lastMouseRef.current) return;
 
@@ -618,6 +669,41 @@ export default function Main() {
 
         const dx = mouseWorld.x - lastWorld.x;
         const dy = mouseWorld.y - lastWorld.y;
+
+        dragDeltaRef.current = { index, handleIn, dx, dy };
+
+        // Apply delta for live preview by mutating history.present.shapes
+        const shape = history.present.shapes[selectedShapeIndex];
+        if (!shape) return;
+
+        const path = shape.paths[selectedPathIndex];
+        if (!path) return;
+
+        const point = path.points[index];
+        if (!point) return;
+
+        // safely update live preview
+        const newIn = handleIn && point.in ? { x: point.in.x + dx, y: point.in.y + dy } : point.in;
+        const newOut = !handleIn && point.out ? { x: point.out.x + dx, y: point.out.y + dy } : point.out;
+
+        point.in = newIn;
+        point.out = newOut;
+
+        lastMouseRef.current = cmp;
+    }
+
+    function stopHandleDrag() {
+        // if no drag is in progress, just remove listeners and exit
+        if (!draggingRef.current || !dragDeltaRef.current) {
+            window.removeEventListener("mousemove", onHandleMouseMove);
+            window.removeEventListener("mouseup", stopHandleDrag);
+            dragDeltaRef.current = null;
+            draggingRef.current = null;
+            return;
+        }
+
+        // safe to commit now
+        const { index, handleIn, dx, dy } = dragDeltaRef.current;
 
         commit(prevShapes =>
             prevShapes.map((shape, si) => {
@@ -635,12 +721,8 @@ export default function Main() {
 
                                 return {
                                     ...p,
-                                    in: handleIn && p.in
-                                        ? { x: p.in.x + dx, y: p.in.y + dy }
-                                        : p.in,
-                                    out: !handleIn && p.out
-                                        ? { x: p.out.x + dx, y: p.out.y + dy }
-                                        : p.out
+                                    in: handleIn && p.in ? { x: p.in.x + dx, y: p.in.y + dy } : p.in,
+                                    out: !handleIn && p.out ? { x: p.out.x + dx, y: p.out.y + dy } : p.out
                                 };
                             })
                         };
@@ -648,8 +730,15 @@ export default function Main() {
                 };
             })
         );
-        lastMouseRef.current = cmp;
+
+        dragDeltaRef.current = null;
+        draggingRef.current = null;
+        window.removeEventListener("mousemove", onHandleMouseMove);
+        window.removeEventListener("mouseup", stopHandleDrag);
     }
+    // =================================================================================================================
+    // POINT HANDLES
+    // =================================================================================================================
 
     function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, i: number) {
         const knob = e.currentTarget as HTMLDivElement;
@@ -769,14 +858,22 @@ export default function Main() {
             ctx.moveTo(points[0].x, points[0].y);
 
             for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
+                const prev = points[i - 1];
+                const curr = points[i];
+                ctx.bezierCurveTo(
+                    prev.out?.x ?? prev.x,
+                    prev.out?.y ?? prev.y,
+                    curr.in?.x ?? curr.x,
+                    curr.in?.y ?? curr.y,
+                    curr.x, curr.y
+                );
             }
             ctx.closePath(); // optional for closed shapes
         }
     }
 
 
-    function MovePoint(pointIndex: number, newPoint: Point) {
+    function MovePointByIndex(pointIndex: number, newPoint: Point) {
 
         if (changeDetected()) {
 
@@ -851,17 +948,16 @@ export default function Main() {
             const start = path.points[selectedSegment];
             const end = path.points[(selectedSegment + 1) % n];
 
-            if (end) {
-                newPoint = lerpVec2(start, end, 0.5);
-                insertPointAt(selectedSegment, newPoint.x, newPoint.y);
-                setSelectedPointIndex(selectedSegment + 1);
-                startDragging(selectedSegment + 1);
-            } else {
-                newPoint = { x: start.x + 10, y: start.y };
-                insertPointAt(path.points.length, newPoint.x, newPoint.y);
-                setSelectedPointIndex(path.points.length - 1);
-                startDragging(path.points.length - 1);
-            }
+            const c1 = start.out ?? start; // fallback if null
+            const c2 = end.in ?? end;
+
+            // get midpoint along cubic Bezier
+            newPoint = cubicBezierPoint(0.5, start, c1, c2, end);
+
+            insertPointAt(selectedSegment, newPoint.x, newPoint.y);
+            setSelectedPointIndex(selectedSegment + 1);
+            startDragging(selectedSegment + 1);
+
         } else {
             if (snapToGrid) {
                 if (!canvasRef.current) return;
@@ -967,7 +1063,23 @@ export default function Main() {
                 y = Math.round(y / spacing) * spacing;
             }
 
-            path.points[index] = { x, y };
+            const dx = x - path.points[index].x;
+            const dy = y - path.points[index].y;
+
+            const p = path.points[index];
+
+            p.x = x;
+            p.y = y;
+
+            if (p.in) {
+                p.in.x += dx;
+                p.in.y += dy;
+            }
+
+            if (p.out) {
+                p.out.x += dx;
+                p.out.y += dy;
+            }
             Draw();
             ReDrawGrid();
         }
@@ -1415,7 +1527,7 @@ export default function Main() {
                                                             type="number"
                                                             value={selectedPoint.x.toFixed(3)}
                                                             onChange={(e) =>
-                                                                MovePoint(
+                                                                MovePointByIndex(
                                                                     selectedPointIndex,
                                                                     { x: Number(e.target.value), y: selectedPoint.y }
                                                                 )}
@@ -1428,7 +1540,7 @@ export default function Main() {
                                                             type="number"
                                                             value={selectedPoint.y.toFixed(3)}
                                                             onChange={(e) =>
-                                                                MovePoint(
+                                                                MovePointByIndex(
                                                                     selectedPointIndex,
                                                                     { x: selectedPoint.x, y: Number(e.target.value) }
                                                                 )}
