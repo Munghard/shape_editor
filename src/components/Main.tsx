@@ -1204,6 +1204,11 @@ export default function Main() {
             prev.map((s, i) => (i === selectedShapeIndex ? updater(s) : s))
         );
     }
+    // function updateShape(index: number, updater: (shape: Shape) => Shape) {
+    //     commit(prev =>
+    //         prev.map((s, i) => (i === index ? updater(s) : s))
+    //     );
+    // }
 
     function handleClickAddNewPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         AddNewPath();
@@ -1671,6 +1676,30 @@ export default function Main() {
                                     </div>
                                 </div>
                             </>}
+                            <div className="panel2">
+                                <h2 className="panel2header">Colors</h2>
+                                <div className="panel2content">
+                                    {Array.from(
+                                        new Set(history.present.shapes.map(shape => shape.fillColor))
+                                    ).map((color, i) => (
+                                        <input
+                                            key={i}
+                                            className="colorSelect"
+                                            type="color"
+                                            value={color}
+                                            onChange={(e) => {
+                                                const newColor = e.target.value;
+                                                commit(prevShapes =>
+                                                    prevShapes.map(s =>
+                                                        s.fillColor === color ? { ...s, fillColor: newColor } : s
+                                                    )
+                                                );
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="panel2">
                                 <h2 className="panel2header">Knobs</h2>
                                 <div className="panel2content">
