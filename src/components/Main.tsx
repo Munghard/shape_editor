@@ -11,7 +11,6 @@ import { APP_NAME } from "../Constants";
 import { Knob } from "./Knob";
 import { Handle } from "./Handle";
 import { DrawHandleLines } from "./OverlayCanvas";
-import type { Camera } from "./Camera";
 
 export type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
@@ -1370,6 +1369,14 @@ export default function Main() {
             };
         });
     }
+    function setShapeName(name: string, index: number): void {
+        commit(prev =>
+            prev.map((p, i) =>
+                i === index ? { ...p, name } : p
+            )
+        );
+    }
+
     return (
         <>
             <div className="flex flex-row justify-between h-screen ">
@@ -1398,10 +1405,10 @@ export default function Main() {
                             <h2 className="panel2header">Shapes</h2>
                             <div className="panel2content">
                                 <div className="flex flex-col gap-2">
-                                    {history.present && history.present.shapes.map((_s, i) => {
+                                    {history.present && history.present.shapes.map((s, i) => {
                                         return (
                                             <div key={i} className="flex flex-row gap-2 justify-between">
-                                                <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>Shape-{i} paths: {_s.paths.length}</button>
+                                                <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>{s.name || "shape"} paths: {s.paths.length}</button>
                                                 <button title="Delete" onClick={() => DeleteShape(i)}><i className="fa fa-x"></i></button>
                                                 <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
                                             </div>
@@ -1409,10 +1416,10 @@ export default function Main() {
                                     })}
                                     <br />
                                     <h2>Paths</h2>
-                                    {shape && shape.paths.map((_s, i) => {
+                                    {shape && shape.paths.map((s, i) => {
                                         return (
                                             <div key={i} className="flex flex-row gap-2 justify-between">
-                                                <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {_s.points.length}</button>
+                                                <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {s.points.length}</button>
                                                 <button title="Delete" onClick={() => DeletePath(i)}><i className="fa fa-x"></i></button>
                                                 {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
                                             </div>
@@ -1584,21 +1591,28 @@ export default function Main() {
                                 </div>
                             }
                             <div className="panel2">
-                                <h2 className="panel2header">Shape</h2>
+                                <h2 className="panel2header">New shape</h2>
                                 <div className="panel2content">
-                                    <p>Shapes: {history.present.shapes.length}</p>
                                     <div className="flex flex-row gap-2">
                                         <button title="Add empty shape" onClick={() => handleClickAddShape("empty")}><i className="fa fa-plus"></i></button>
                                         <button title="Add circle shape" onClick={() => handleClickAddShape("circle")}><i className="fa fa-circle"></i></button>
                                         <button title="Add circle shape" onClick={() => handleClickAddShape("square")}><i className="fa fa-square"></i></button>
                                         <button title="Add triangle shape" onClick={() => handleClickAddShape("triangle")}><i className="fa fa-play rotate-270"></i></button>
                                     </div>
-                                    <p>Selected shape:
-                                        <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={history.present.shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
-                                    </p>
-                                    <button onClick={(_e) => AddNewShape("", CloneShape(shape))}>Duplicate</button>
-                                    {shape &&
+                                </div>
+                            </div>
+                            {
+                                shape &&
 
+                                <div className="panel2">
+                                    <h2 className="panel2header">Shape</h2>
+                                    <div className="panel2content">
+                                        {/* <p>Shapes: {history.present.shapes.length}</p> */}
+                                        <p>Selected shape:
+                                            <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={history.present.shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
+                                        </p>
+                                        <label>Name: <input type="text" value={shape.name} onChange={(e) => setShapeName(e.target.value, selectedShapeIndex)}></input></label>
+                                        <button onClick={(_e) => AddNewShape("", CloneShape(shape))}>Duplicate</button>
                                         <div className="flex flex-row gap-2">
                                             <p>Order:</p>
                                             <button onClick={moveForward}><i className="fa fa-arrow-up"></i></button>
@@ -1607,9 +1621,9 @@ export default function Main() {
                                                 <button title="Delete shape" onClick={DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
                                             }
                                         </div>
-                                    }
+                                    </div>
                                 </div>
-                            </div>
+                            }
                             {shape && <>
                                 <div className="panel2">
                                     <h2 className="panel2header">Paths</h2>
@@ -1746,6 +1760,33 @@ export default function Main() {
                                                 }}
                                             />
                                         ))}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h2>Flip</h2>
+                                        {Array.from(
+                                            new Set(
+                                                history.present.shapes.map(s => `${s.strokeColor}|${s.fillColor}`)
+                                            )
+                                        ).map((pair, i) => {
+                                            const [stroke, fill] = pair.split("|");
+
+                                            return (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => {
+                                                        commit(prevShapes =>
+                                                            prevShapes.map(s =>
+                                                                s.strokeColor === stroke && s.fillColor === fill
+                                                                    ? { ...s, strokeColor: fill, fillColor: stroke }
+                                                                    : s
+                                                            )
+                                                        );
+                                                    }}
+                                                >
+                                                    {"<->"}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </div>

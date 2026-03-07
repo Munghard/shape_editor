@@ -14,8 +14,9 @@ export type Path = {
     isHole: boolean;
 }
 export type Shape = {
-    paths: Path[]
+    name: string;
 
+    paths: Path[];
     cyclic: boolean;
 
     strokeWidth: number;
@@ -75,6 +76,7 @@ export function CirclePath(radius = 50, segments = 32): Path {
 export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
 
     return {
+        name: "shape",
         paths,
         cyclic: true,
         fillColor: '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'),
