@@ -18,18 +18,18 @@ DONE
 - [x] session save
 - [x] make some kind of frame for exporting, can be in the file panel just a x,y value that you set and then theres an overlay on canvas
 - [x] move all shapes
+- [x] colors panel, display all colors in file and allow changing 
+- [x]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
+- [x] collapsible panels, make panel2 into a component with children and headertitle
 
 TODO
 - [ ] add hotkeys for delete selection, shape, point, path (delete) . duplicate (ctrl + D, alt + move)
 - [ ] preview shapes for live updating when moving curve handles
 - [ ] something wrong with grid rendering when you turn it off
-- [ ] colors panel, display all colors in file and allow changing 
 - [ ] export to svg, maybe other formats too
 - [ ] center camera button
 - [ ] Multi shape select
 - [ ] opacity to stroke and fill
-- [ ]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
 
 QOL
 - [ ] light theme
-- [ ] collapsible panels
