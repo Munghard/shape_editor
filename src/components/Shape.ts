@@ -109,8 +109,20 @@ export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
                 curr.x, curr.y
             );
         }
+        if (shape.cyclic && points.length > 1) {
+            const last = points[points.length - 1];
+            const first = points[0];
 
-        if (shape.cyclic) ctx.closePath();
+            ctx.bezierCurveTo(
+                last.out?.x ?? last.x,
+                last.out?.y ?? last.y,
+                first.in?.x ?? first.x,
+                first.in?.y ?? first.y,
+                first.x,
+                first.y
+            );
+            ctx.closePath();
+        }
     });
 
     ctx.lineWidth = shape.strokeWidth;

@@ -247,6 +247,7 @@ export default function Main() {
             // 3️⃣ Single keys
             switch (key) {
                 case "q": setTool("Select"); break;
+                case "d": setTool("Delete"); break;
                 case "f": setTool("Frame"); break;
                 case "s": setTool("Scale"); break;
                 case "r": setTool("Rotate"); break;
@@ -798,7 +799,7 @@ export default function Main() {
         if (tool === "Pan" || tool === "Scale" || tool === "Rotate" || tool === "Frame") {
             lastMouseRef.current = { x: screenX, y: screenY }
         }
-        if (tool === "Select" || tool === "Move") {
+        if (tool === "Select" || tool === "Move" || tool === "Scale" || tool === "Rotate") {
             selectShapeAt(ctx, screenX, screenY);
         }
         else if (tool === "Insert") {
@@ -891,7 +892,20 @@ export default function Main() {
                     curr.x, curr.y
                 );
             }
-            ctx.closePath(); // optional for closed shapes
+            if (shape.cyclic && points.length > 1) {
+                const last = points[points.length - 1];
+                const first = points[0];
+
+                ctx.bezierCurveTo(
+                    last.out?.x ?? last.x,
+                    last.out?.y ?? last.y,
+                    first.in?.x ?? first.x,
+                    first.in?.y ?? first.y,
+                    first.x,
+                    first.y
+                );
+                ctx.closePath(); // optional for closed shapes
+            }
         }
     }
 
@@ -1217,7 +1231,7 @@ export default function Main() {
     function DeleteShape(index: number): void {
         if (index === -1) return;
         commit(prev => [...prev.filter((_s, i) => i !== index)]);
-        setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
+        setSelectedShapeIndex(-1);
         setSelectedSegment(0);
     }
 
@@ -1265,13 +1279,13 @@ export default function Main() {
         );
         setSelectedPathIndex(prev => Math.max(prev - 1, 0));
     }
-    function DeletePath(index: number): void {
+    function DeletePath(shapeIndex: number, pathIndex: number): void {
         commit(prev =>
             prev.map((s, i) => {
-                if (i !== index) return s;
+                if (i !== shapeIndex) return s;
 
                 const newPaths = [
-                    ...s.paths.filter((_p, i) => i !== index)
+                    ...s.paths.filter((_p, i) => i !== pathIndex)
                 ];
                 return { ...s, paths: newPaths }
             })
@@ -1377,6 +1391,15 @@ export default function Main() {
         );
     }
 
+    function clearDocument(): void {
+        setHistory({ past: [], present: { shapes: [] }, future: [] });
+        setSelectedPointIndex(-1);
+        setSelectedPathIndex(-1);
+        setSelectedShapeIndex(-1)
+        localStorage.removeItem("Session");
+        if (canvasRef.current) ClearCanvas(canvasRef.current.getContext("2d")!);
+    }
+
     return (
         <>
             <div className="flex flex-row justify-between h-screen ">
@@ -1414,7 +1437,7 @@ export default function Main() {
                                 return (
                                     <div key={i} className="flex flex-row gap-2 justify-between">
                                         <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {s.points.length}</button>
-                                        <button title="Delete" onClick={() => DeletePath(i)}><i className="fa fa-x"></i></button>
+                                        <button title="Delete" onClick={() => DeletePath(history.present.shapes.indexOf(shape), i)}><i className="fa fa-x"></i></button>
                                         {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
                                     </div>
                                 )
@@ -1840,7 +1863,7 @@ export default function Main() {
                                 <button title="Export/Download" onClick={handleExport}><i className="fa-solid fa-download"></i></button>
                                 <button title="Save" onClick={handleSave}><i className="fa-solid fa-floppy-disk"></i></button>
                                 <button title="Load" onClick={handleLoad}><i className="fa-solid fa-folder"></i></button>
-                                <button title="New" onClick={() => { commit(() => [CreateBaseShape()]); setSelectedPointIndex(-1); setSelectedPathIndex(0); setSelectedShapeIndex(0) }}><i className="fa-solid fa-file"></i></button>
+                                <button title="Clear" onClick={() => clearDocument()}><i className="fa-solid fa-file"></i></button>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <h2>Export frame</h2>
