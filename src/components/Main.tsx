@@ -23,13 +23,13 @@ export default function Main() {
 
     document.title = APP_NAME;
 
-    const [loaded, setLoaded] = useState(false);
     // HISTORY
     const [history, setHistory] = useState<History>({
         past: [],
         present: { shapes: [] },
         future: []
     });
+    const [loaded, setLoaded] = useState(false);
 
     // FILE
     const [fileName, setFileName] = useState<string>("NewFile");
@@ -37,13 +37,14 @@ export default function Main() {
 
     // CANVAS
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null);
+    const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null); // this is for knobs
 
     //SHAPE
     const [hiddenShapeIndicies, setHiddenShapeIndicies] = useState<number[]>([]);
     const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(-1);
 
     const shape = history.present.shapes[selectedShapeIndex];
+    const shapes = history.present.shapes;
 
     // PATH
     const [selectedPathIndex, setSelectedPathIndex] = useState<number>(-1);
@@ -102,23 +103,17 @@ export default function Main() {
     // Session LOADING
     useEffect(() => {
         const saved = localStorage.getItem("Session");
-        if (!saved) return;
-        try {
-
-            const data = JSON.parse(saved) as {
-                history: History;
-                frame: Rect;
-                tool: Tool;
-            };
-            // Extract each piece
-            if (data.history) setHistory(data.history);
-            if (data.frame) setFrame(data.frame);
-            if (data.tool) setTool(data.tool);
-
-
-        } catch (error) {
-            console.warn("Failed to load session");
+        if (saved) {
+            try {
+                const data = JSON.parse(saved) as { history: History; frame: Rect; tool: Tool };
+                if (data.history) setHistory(data.history);
+                if (data.frame) setFrame(data.frame);
+                if (data.tool) setTool(data.tool);
+            } catch (error) {
+                console.warn("Failed to load session");
+            }
         }
+        // always mark as loaded, even if no saved session
         setLoaded(true);
     }, []);
 
@@ -129,7 +124,7 @@ export default function Main() {
         var json = JSON.stringify(SaveData);
         localStorage.setItem("Session", json);
 
-    }, [history, loaded, frame, tool]);
+    }, [history, shapes, loaded, frame, tool]);
 
     // RECENT FILES
     useEffect(() => {
@@ -150,7 +145,7 @@ export default function Main() {
         const rect = canvas.getBoundingClientRect();
         setCanvasRect(rect);
 
-    }, [history.present.shapes, knobSize, hiddenShapeIndicies, selectedPoint]);
+    }, [history.present.shapes, knobSize, hiddenShapeIndicies, selectedPoint, selectedShapeIndex, selectedPathIndex]);
 
     function Draw() {
 
@@ -162,7 +157,12 @@ export default function Main() {
         ClearCanvas(ctx);
 
         ctx.setTransform(cameraRef.current.zoom, 0, 0, cameraRef.current.zoom, -cameraRef.current.x * cameraRef.current.zoom, -cameraRef.current.y * cameraRef.current.zoom)
-        history.present.shapes.forEach((shape, i) => { if (!hiddenShapeIndicies.includes(i)) DrawShape(ctx, shape) });
+
+        history.present.shapes.forEach((shape, i) => {
+            if (!hiddenShapeIndicies.includes(i)) {
+                DrawShape(ctx, shape);
+            }
+        });
 
         const coCanvas = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
         const coctx = coCanvas.getContext("2d") as CanvasRenderingContext2D;
@@ -519,7 +519,7 @@ export default function Main() {
 
                 dragOffset.current = { x: screenX, y: screenY };
                 Draw();
-                ReDrawGrid();
+                // ReDrawGrid();
             }
         }
         else if (tool === "Rotate" && dragging && lastMouseRef.current) {
@@ -556,6 +556,7 @@ export default function Main() {
                     });
                 });
             }
+            dragOffset.current = { x: screenX, y: screenY };
             Draw();
         }
         if (tool === "Scale" && dragging && lastMouseRef.current) {
@@ -590,6 +591,7 @@ export default function Main() {
                     });
                 });
             }
+            dragOffset.current = { x: screenX, y: screenY };
             Draw();
         }
         else if (tool === "Frame" && dragging && lastMouseRef.current) {
@@ -805,12 +807,12 @@ export default function Main() {
         const screenX = cmp.x;
         const screenY = cmp.y;
 
-        var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
 
         if (tool === "Pan" || tool === "Scale" || tool === "Rotate" || tool === "Frame") {
             lastMouseRef.current = { x: screenX, y: screenY }
         }
         if (tool === "Select" || tool === "Move" || tool === "Scale" || tool === "Rotate") {
+            var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
             selectShapeAt(ctx, screenX, screenY);
         }
         else if (tool === "Insert") {
@@ -830,10 +832,7 @@ export default function Main() {
             }
         }
 
-        if (selectedShapeIndex !== -1) { // this doesnt work because selectedshapeindex is never -1 so drag is always set on click
-
-            dragOffset.current = { x: screenX, y: screenY };
-        }
+        dragOffset.current = { x: screenX, y: screenY };
         setDragging(true);
     }
 
@@ -854,32 +853,32 @@ export default function Main() {
     }
 
     function selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
-        const prevShape = selectedShapeIndex;
-        const prevPath = selectedPathIndex;
+        let foundShapeIndex = -1;
+        let nextPathIndex = -1;
 
-        setSelectedShapeIndex(-1);
-        setSelectedPathIndex(-1);
-        setSelectedPointIndex(-1);
-
+        // loop from top-most shape down
         for (let i = history.present.shapes.length - 1; i >= 0; i--) {
             buildPath(ctx, history.present.shapes[i]);
 
             if (ctx.isPointInPath(x, y)) {
+                foundShapeIndex = i;
 
-                setSelectedShapeIndex(i);
-
-                let nextPathIndex = 0;
-
-                if (i === prevShape) {
+                if (i === selectedShapeIndex) {
                     // cycle to next path
                     const pathCount = history.present.shapes[i].paths.length;
-                    nextPathIndex = (prevPath + 1) % pathCount;
+                    nextPathIndex = (selectedPathIndex + 1) % pathCount;
+                } else {
+                    nextPathIndex = 0;
                 }
 
-                setSelectedPathIndex(nextPathIndex);
                 break;
             }
         }
+
+        // update state **once**, after selection is determined
+        setSelectedShapeIndex(foundShapeIndex);
+        setSelectedPathIndex(nextPathIndex);
+        setSelectedPointIndex(-1);
     }
 
     function buildPath(ctx: CanvasRenderingContext2D, shape: Shape) {
@@ -1224,6 +1223,8 @@ export default function Main() {
             // newShape.paths.forEach(pa => pa.points.forEach(po => { po.x += offset.x; po.y += offset.y; }));
         }
 
+        newShape = CloneShape(newShape);
+
         const newIndex = history.present.shapes.length;
 
         commit(prev => [...prev, newShape]);
@@ -1459,23 +1460,24 @@ export default function Main() {
 
                     <Panel title="Shapes">
                         <div className="flex flex-col gap-2">
-                            {history.present && history.present.shapes.map((s, i) => {
+                            {shapes && shapes.map((s, i) => {
                                 return (
-                                    <div key={i} className="flex flex-row gap-2 justify-between">
-                                        <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>{s.name || "shape"} paths: {s.paths.length}</button>
-                                        <button title="Delete" onClick={() => DeleteShape(i)}><i className="fa fa-x"></i></button>
-                                        <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
-                                    </div>
-                                )
-                            })}
-                            <br />
-                            <h2>Paths</h2>
-                            {shape && shape.paths.map((s, i) => {
-                                return (
-                                    <div key={i} className="flex flex-row gap-2 justify-between">
-                                        <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {s.points.length}</button>
-                                        <button title="Delete" onClick={() => DeletePath(history.present.shapes.indexOf(shape), i)}><i className="fa fa-x"></i></button>
-                                        {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
+                                    <div key={i} className="flex flex-col gap-2 ">
+                                        <div key={i} className="flex flex-row gap-2 justify-between">
+                                            <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>{s.name || "shape"} paths: {s.paths.length}</button>
+                                            <button title="Delete" onClick={() => DeleteShape(i)}><i className="fa fa-x"></i></button>
+                                            <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
+
+                                        </div>
+                                        {i === selectedShapeIndex && s.paths.map((s, i) => {
+                                            return (
+                                                <div key={i} className="pl-5 flex flex-row gap-2 justify-between">
+                                                    <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {s.points.length}</button>
+                                                    <button title="Delete" onClick={() => DeletePath(history.present.shapes.indexOf(shape), i)}><i className="fa fa-x"></i></button>
+                                                    {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 )
                             })}

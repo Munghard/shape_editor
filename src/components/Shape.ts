@@ -1,3 +1,4 @@
+import { clonePath } from "../Utilities/Utilities";
 
 export type Vec2 = {
     x: number;
@@ -62,9 +63,13 @@ export function CirclePath(radius = 50, segments = 32): Path {
     const points: Point[] = [];
     for (let i = 0; i < segments; i++) {
         const angle = (i / segments) * 2 * Math.PI;
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
         points.push({
-            x: Math.cos(angle) * radius,
-            y: Math.sin(angle) * radius
+            x: x,
+            y: y,
+            in: { x, y },
+            out: { x, y }
         });
     }
     return {
@@ -74,10 +79,9 @@ export function CirclePath(radius = 50, segments = 32): Path {
 }
 
 export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
-
     return {
         name: "shape",
-        paths,
+        paths: paths.map(clonePath),
         cyclic: true,
         fillColor: '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'),
         strokeColor: "#ffffff",
@@ -85,10 +89,10 @@ export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
         useFill: true,
         useStroke: true
     }
-
 }
 
 export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
+
     if (shape.paths.length === 0) return;
 
     ctx.beginPath();
@@ -101,27 +105,29 @@ export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
         for (let i = 1; i < points.length; i++) {
             const prev = points[i - 1];
             const curr = points[i];
-            ctx.bezierCurveTo(
-                prev.out?.x ?? prev.x,
-                prev.out?.y ?? prev.y,
-                curr.in?.x ?? curr.x,
-                curr.in?.y ?? curr.y,
-                curr.x, curr.y
-            );
+
+            const px = prev.out?.x ?? prev.x;
+            const py = prev.out?.y ?? prev.y;
+            const cx = curr.in?.x ?? curr.x;
+            const cy = curr.in?.y ?? curr.y;
+
+            if ([px, py, cx, cy].some(v => isNaN(v))) continue;
+            ctx.bezierCurveTo(px, py, cx, cy, curr.x, curr.y);
         }
         if (shape.cyclic && points.length > 1) {
             const last = points[points.length - 1];
             const first = points[0];
 
-            ctx.bezierCurveTo(
-                last.out?.x ?? last.x,
-                last.out?.y ?? last.y,
-                first.in?.x ?? first.x,
-                first.in?.y ?? first.y,
-                first.x,
-                first.y
-            );
-            ctx.closePath();
+            const px = last.out?.x ?? last.x;
+            const py = last.out?.y ?? last.y;
+            const cx = first.in?.x ?? first.x;
+            const cy = first.in?.y ?? first.y;
+
+            // skip if any coordinate is invalid
+            if (![px, py, cx, cy, first.x, first.y, last.x, last.y].some(v => isNaN(v))) {
+                ctx.bezierCurveTo(px, py, cx, cy, first.x, first.y);
+                ctx.closePath();
+            }
         }
     });
 
