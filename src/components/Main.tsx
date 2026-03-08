@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from "react"
 import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
-import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect } from "./Shape";
+import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect, type Path, CreateEmptyPath } from "./Shape";
 import getHoveredSegment from "./Segment";
 import { type SaveData } from "./SaveData";
 import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
-import type { History } from "./History";
+import type { History, HistoryState } from "./History";
 import { toolTooltip } from "./ToolTooltips";
 import { APP_NAME } from "../Constants";
 import { Knob } from "./Knob";
@@ -27,10 +27,15 @@ export default function Main() {
     // HISTORY
     const [history, setHistory] = useState<History>({
         past: [],
-        present: { shapes: [] },
+        present: {
+            shapeOrder: [],
+            shapes: {},
+            paths: {},
+            points: {}
+        },
         future: []
     });
-
+    const { shapeOrder, shapes, paths, points } = history.present;
     // FILE
     const [fileName, setFileName] = useState<string>("NewFile");
     const [frame, setFrame] = useState<Rect>({ x: -500, y: -500, w: 1000, h: 1000 });
@@ -40,26 +45,21 @@ export default function Main() {
     const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null);
 
     //SHAPE
-    const [hiddenShapeIndicies, setHiddenShapeIndicies] = useState<number[]>([]);
-    const [selectedShapeIndex, setSelectedShapeIndex] = useState<number>(-1);
+    const [hiddenShapeIds, setHiddenShapeIds] = useState<string[]>([]);
+    const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
 
-    const shape = history.present.shapes[selectedShapeIndex];
+    const shape = selectedShapeId ? history.present.shapes[selectedShapeId] : null;
 
     // PATH
-    const [selectedPathIndex, setSelectedPathIndex] = useState<number>(-1);
+    const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
     // const [hiddenPathIndicies, setHiddenPathIndicies] = useState<number[]>([]);
 
     // POINT
-    const [selectedPointIndex, setSelectedPointIndex] = useState<number>(-1);
+    const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
     // auto updating selectedpoint logic
-    const selectedPoint =
-        selectedShapeIndex !== -1 &&
-            selectedPathIndex !== -1 &&
-            selectedPointIndex !== -1
-            ? history.present.shapes[selectedShapeIndex]
-                ?.paths[selectedPathIndex]
-                ?.points[selectedPointIndex]
-            : null;
+    const selectedPoint = selectedPointId ? history.present.points[selectedPointId] : null;
+    // multiselect
+    // const [selectedPointIds, setSelectedPointIds] = useState<Set<string>>(new Set());
 
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
@@ -150,7 +150,7 @@ export default function Main() {
         const rect = canvas.getBoundingClientRect();
         setCanvasRect(rect);
 
-    }, [history.present.shapes, knobSize, hiddenShapeIndicies, selectedPoint]);
+    }, [history.present.shapes, knobSize, hiddenShapeIds, selectedPoint]);
 
     function Draw() {
 
@@ -162,7 +162,7 @@ export default function Main() {
         ClearCanvas(ctx);
 
         ctx.setTransform(cameraRef.current.zoom, 0, 0, cameraRef.current.zoom, -cameraRef.current.x * cameraRef.current.zoom, -cameraRef.current.y * cameraRef.current.zoom)
-        history.present.shapes.forEach((shape, i) => { if (!hiddenShapeIndicies.includes(i)) DrawShape(ctx, shape) });
+        Object.values(history.present.shapes).forEach((shape) => { if (!hiddenShapeIds.includes(shape.id)) DrawShape(ctx, shape, history.present.paths, history.present.points) });
 
         const coCanvas = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
         const coctx = coCanvas.getContext("2d") as CanvasRenderingContext2D;
@@ -189,16 +189,16 @@ export default function Main() {
 
     // ON SELECTED SHAPE CHANGED SET PATHINDEX TO 0 AND POINT INDEX TO "NULL" ELSE CRASH
     useEffect(() => {
-        if (selectedShapeIndex !== -1) {
-            setSelectedPathIndex(0);
-            setSelectedPointIndex(-1);
+        if (selectedShapeId !== null) {
+            setSelectedPathId(null);
+            setSelectedPointId(null);
         }
         else {
 
-            setSelectedPathIndex(-1);
-            setSelectedPointIndex(-1);
+            setSelectedPathId(null);
+            setSelectedPointId(null);
         }
-    }, [selectedShapeIndex]);
+    }, [selectedShapeId]);
 
 
 
@@ -215,8 +215,8 @@ export default function Main() {
             const key = e.key.toLowerCase();
             // 1️⃣ Special keys
             if (key === "delete") {
-                if (selectedShapeIndex !== -1) {
-                    DeleteShape(selectedShapeIndex);
+                if (selectedShapeId !== null) {
+                    DeleteShape(selectedShapeId);
                 }
                 e.preventDefault();
                 return;
@@ -239,7 +239,17 @@ export default function Main() {
                 return;
             }
             if (e.ctrlKey && key === "d") {
-                if (shape) AddNewShape("", CloneShape(shape));
+                if (shape) {
+                    const cloned = CloneShape(shape, paths, points);
+                    AddNewShape("", cloned.shape);
+
+                    // merge cloned paths and points into state
+                    commit(prev => ({
+                        ...prev,
+                        paths: { ...prev.paths, ...cloned.paths },
+                        points: { ...prev.points, ...cloned.points }
+                    }));
+                }
                 e.preventDefault();
                 return;
             }
@@ -269,7 +279,7 @@ export default function Main() {
             window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener("keyup", handleKeyUp);
         }
-    }, [shape, selectedShapeIndex]);
+    }, [shape, selectedShapeId]);
 
 
     // RESIZE CANVASES ON CHANGE
@@ -346,68 +356,74 @@ export default function Main() {
         const current = history.present.shapes;
         const lastPast = history.past[history.past.length - 1]?.shapes;
 
-        return !shapesEqual(current, lastPast);
-    }
+        if (!lastPast) return false;
 
-    function handleAddCurveToPoint(index: number) {
-        commit(prevShapes =>
-            prevShapes.map((s, i) => {
-                if (i !== selectedShapeIndex) return s;
-
-                const newPaths = [...s.paths];
-                const currentPath = { ...newPaths[selectedPathIndex] };
-
-                const newPoints = [...currentPath.points];
-                const p = { ...newPoints[index] };
-
-                const count = newPoints.length;
-
-                const prevIndex = (index - 1 + count) % count;
-                const nextIndex = (index + 1) % count;
-
-                const prev = { ...newPoints[prevIndex] };
-                const next = { ...newPoints[nextIndex] };
-
-                const newP = lerpVec2(p, prev, 0.5);
-                const newN = lerpVec2(p, next, 0.5);
-
-                p.in = { x: newP.x, y: newP.y };
-                p.out = { x: newN.x, y: newN.y };
-
-                newPoints[index] = p;
-                currentPath.points = newPoints;
-
-                newPaths[selectedPathIndex] = currentPath;
-
-                return { ...s, paths: newPaths };
-            })
+        return !shapesEqual(
+            Object.values(current),
+            Object.values(lastPast),
+            history.present.paths,
+            history.past[history.past.length - 1].paths,
+            history.present.points,
+            history.past[history.past.length - 1].points
         );
     }
-    function handleRemovePoint(index: number) {
 
-        commit(prevShapes =>
-            prevShapes.map((s, i) => {
-                if (i !== selectedShapeIndex) return s;
+    function handleAddCurveToPoint(pointId: string) {
+        if (!selectedPathId) return;
 
-                const newPaths = [...s.paths];
-                const currentPath = { ...newPaths[selectedPathIndex] };
+        commit(prev => {
+            const path = prev.paths[selectedPathId];
+            if (!path) return prev;
 
-                currentPath.points = currentPath.points.filter(
-                    (_p, idx) => idx !== index
-                );
+            const n = path.pointIds.length;
+            const index = path.pointIds.indexOf(pointId);
+            if (index === -1) return prev;
 
-                newPaths[selectedPathIndex] = currentPath;
+            const prevId = path.pointIds[(index - 1 + n) % n];
+            const nextId = path.pointIds[(index + 1) % n];
 
-                return { ...s, paths: newPaths };
-            })
-        );
+            const p = prev.points[pointId];
+            const prevPoint = prev.points[prevId];
+            const nextPoint = prev.points[nextId];
 
-        setSelectedPointIndex(prev => {
-            if (prev === null) return 0;
-            if (prev === index) return 0;
-            if (prev > index) return prev - 1;
-            return prev;
+            const newP = lerpVec2(p, prevPoint, 0.5);
+            const newN = lerpVec2(p, nextPoint, 0.5);
+
+            const updatedPoint: Point = {
+                ...p,
+                in: { x: newP.x, y: newP.y },
+                out: { x: newN.x, y: newN.y }
+            };
+
+            return {
+                ...prev,
+                points: { ...prev.points, [pointId]: updatedPoint }
+            };
         });
+    }
+    function handleRemovePoint(pointId: string) {
+        if (!selectedPathId) return;
+
+        commit(prev => {
+            const path = prev.paths[selectedPathId];
+            if (!path) return prev;
+
+            // remove the point ID from the path
+            const newPointIds = path.pointIds.filter(pid => pid !== pointId);
+            const newPath = { ...path, pointIds: newPointIds };
+
+            // remove the point from the points table
+            const { [pointId]: _, ...newPoints } = prev.points;
+
+            return {
+                ...prev,
+                paths: { ...prev.paths, [selectedPathId]: newPath },
+                points: newPoints
+            };
+        });
+
+        // update selection
+        setSelectedPointId(prev => (prev === pointId ? null : prev));
     }
 
     // ================================================================================================================
@@ -489,107 +505,114 @@ export default function Main() {
         let screenX = cmp.x;
         let screenY = cmp.y;
 
-        if (tool === "Move") {
+        if (tool === "Move" && dragging && lastMouseRef.current) {
             // return if no shape selected
-            if (!shape) return;
+
             // move all points in paths in shape
-            if (dragging) {
-                const dx = (screenX - dragOffset.current.x) / cameraRef.current.zoom;
-                const dy = (screenY - dragOffset.current.y) / cameraRef.current.zoom;
 
-                const shape = history.present.shapes[selectedShapeIndex];
-                const shapes = history.present.shapes;
+            if (!selectedShapeId) return;
 
-                if (e.ctrlKey) {
-                    shapes.forEach(shape => {
-                        shape.paths.forEach(path => {
-                            path.points.forEach(p => {
-                                MovePoint(p, dx, dy);
-                            });
-                        });
+            const dx = (screenX - dragOffset.current.x) / cameraRef.current.zoom;
+            const dy = (screenY - dragOffset.current.y) / cameraRef.current.zoom;
+
+            const shapeIdsToChange = e.ctrlKey ?
+                Object.keys(history.present.shapes) : [selectedShapeId]
+
+            shapeIdsToChange.forEach(shapeId => {
+                const shape = history.present.shapes[shapeId];
+                if (!shape) return;
+
+                shape.pathIds.forEach(pathId => {
+                    const path = history.present.paths[pathId];
+                    if (!path) return;
+
+                    path.pointIds.forEach(pointId => {
+                        const p = history.present.points[pointId];
+                        if (!p) return;
+
+                        // mutate in place
+                        p.x += dx;
+                        p.y += dy;
                     });
-                }
-                else {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            MovePoint(p, dx, dy);
-                        });
-                    });
-                }
+                });
+            });
 
-                dragOffset.current = { x: screenX, y: screenY };
-                Draw();
-                ReDrawGrid();
-            }
+
+            dragOffset.current = { x: screenX, y: screenY };
+            Draw();
+            ReDrawGrid();
+
         }
         else if (tool === "Rotate" && dragging && lastMouseRef.current) {
+            if (!selectedShapeId) return;
 
-            // const dx = screenX - lastMouseRef.current.x;
             const dy = screenY - lastMouseRef.current.y;
 
             lastMouseRef.current = { x: screenX, y: screenY };
 
-            const shape = history.present.shapes[selectedShapeIndex];
-            const shapes = history.present.shapes;
-            if (!shape) return;
 
-            const center = getShapeCenter(shape);
+            const shapeIdsToChange = e.ctrlKey ?
+                Object.keys(history.present.shapes) : [selectedShapeId]
 
-            // Rotate based on vertical mouse delta (dy)
-            // You can tweak the factor to control sensitivity
-            const angle = dy * 0.01; // radians
-            const sin = Math.sin(angle);
-            const cos = Math.cos(angle);
-            if (e.ctrlKey) {
-                shapes.forEach(shape => {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            RotatePoint(p, center, cos, sin);
-                        });
-                    });
-                });
-            }
-            else {
-                shape.paths.forEach(path => {
-                    path.points.forEach(p => {
+            shapeIdsToChange.forEach(shapeId => {
+                const shape = history.present.shapes[shapeId];
+                if (!shape) return;
+
+                const center = getShapeCenter(shape, paths, points);
+
+                // Rotate based on vertical mouse delta (dy)
+                // You can tweak the factor to control sensitivity
+                const angle = dy * 0.01; // radians
+                const sin = Math.sin(angle);
+                const cos = Math.cos(angle);
+                shape.pathIds.forEach(pathId => {
+                    const path = history.present.paths[pathId];
+                    if (!path) return;
+
+                    path.pointIds.forEach(pointId => {
+                        const p = history.present.points[pointId];
+                        if (!p) return;
+
+                        // mutate in place
                         RotatePoint(p, center, cos, sin);
                     });
                 });
-            }
+            });
+            dragOffset.current = { x: screenX, y: screenY };
             Draw();
         }
-        if (tool === "Scale" && dragging && lastMouseRef.current) {
-
+        else if (tool === "Scale" && dragging && lastMouseRef.current) {
+            if (!selectedShapeId) return;
             // const dx = screenX - lastMouseRef.current.x;
             const dy = screenY - lastMouseRef.current.y;
 
             lastMouseRef.current = { x: screenX, y: screenY };
 
-            const shape = history.present.shapes[selectedShapeIndex];
-            const shapes = history.present.shapes;
-            if (!shape) return;
+            const shapeIdsToChange = e.ctrlKey ?
+                Object.keys(history.present.shapes) : [selectedShapeId]
 
-            const center = getShapeCenter(shape);
+            shapeIdsToChange.forEach(shapeId => {
+                const shape = history.present.shapes[shapeId];
+                if (!shape) return;
 
-            const scaleFactor = Math.max(0.1, 1 + dy * 0.01);
+                const center = getShapeCenter(shape, paths, points);
 
-            if (e.ctrlKey) {
-                shapes.forEach(shape => {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            ScalePoint(p, center, scaleFactor);
-                        });
-                    });
-                });
-            }
-            else {
+                const scaleFactor = Math.max(0.1, 1 + dy * 0.01);
 
-                shape.paths.forEach(path => {
-                    path.points.forEach(p => {
+                shape.pathIds.forEach(pathId => {
+                    const path = history.present.paths[pathId];
+                    if (!path) return;
+
+                    path.pointIds.forEach(pointId => {
+                        const p = history.present.points[pointId];
+                        if (!p) return;
+
+                        // mutate in place
                         ScalePoint(p, center, scaleFactor);
                     });
                 });
-            }
+            });
+            dragOffset.current = { x: screenX, y: screenY };
             Draw();
         }
         else if (tool === "Frame" && dragging && lastMouseRef.current) {
@@ -612,9 +635,7 @@ export default function Main() {
 
             lastMouseRef.current = { x: screenX, y: screenY }
 
-            // Draw()
-            // ReDrawGrid();
-            // console.log(cameraRef.current.x, cameraRef.current.y)
+
         }
         else if (tool === "Pan" && dragging && lastMouseRef.current) {
             if (!lastMouseRef.current) return
@@ -634,10 +655,11 @@ export default function Main() {
             // console.log(cameraRef.current.x, cameraRef.current.y)
         }
         else if (tool === "Insert") {
-
+            if (!selectedPathId) return;
+            if (!selectedShapeId) return;
             const threshold = 10; // pixels
             const worldPos = screenToWorld(screenX, screenY, cameraRef.current);
-            var seg = getHoveredSegment(shape, threshold, worldPos.x, worldPos.y, selectedPathIndex);
+            var seg = getHoveredSegment(paths, points, threshold, worldPos.x, worldPos.y, selectedPathId);
             setSelectedSegment(seg);
             // console.log("segment: " + seg);
 
@@ -652,10 +674,14 @@ export default function Main() {
             // we are hovering a valid segment
             if (seg !== -1) {
                 // draw a knob in the middle
-                const path = shape.paths[selectedPathIndex];
-                const n = path.points.length;
-                const start = path.points[seg];
-                const end = path.points[(seg + 1) % n]; // loops back to first point if last
+                const path = paths[selectedPathId];
+                const pointIds = path.pointIds;
+                const shapePoints = Object.values(pointIds).map(pid => points[pid]);
+
+
+                const n = shapePoints.length;
+                const start = shapePoints[seg];
+                const end = shapePoints[(seg + 1) % n]; // loops back to first point if last
 
                 const c1 = start.out ?? start;
                 const c2 = end.in ?? end;
@@ -695,7 +721,7 @@ export default function Main() {
 
     // POINT HANDLES
     function handleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
-        if (!canvasRef.current || !lastMouseRef.current) return;
+        if (!canvasRef.current || !lastMouseRef.current || !selectedShapeId || !selectedPathId) return;
 
         const cmp = getCanvasMousePos(e, canvasRef.current);
         const mouseWorld = screenToWorld(cmp.x, cmp.y, cameraRef.current);
@@ -707,13 +733,13 @@ export default function Main() {
         dragDeltaRef.current = { index, handleIn, dx, dy };
 
         // Apply delta for live preview by mutating history.present.shapes
-        const shape = history.present.shapes[selectedShapeIndex];
+        const shape = shapes[selectedShapeId];
         if (!shape) return;
 
-        const path = shape.paths[selectedPathIndex];
+        const path = paths[selectedPathId];
         if (!path) return;
 
-        const point = path.points[index];
+        const point = points[index];
         if (!point) return;
 
         // safely update live preview
@@ -728,7 +754,7 @@ export default function Main() {
 
     function stopHandleDrag() {
         // if no drag is in progress, just remove listeners and exit
-        if (!draggingRef.current || !dragDeltaRef.current) {
+        if (!draggingRef.current || !dragDeltaRef.current || !selectedPathId) {
             window.removeEventListener("mousemove", onHandleMouseMove);
             window.removeEventListener("mouseup", stopHandleDrag);
             dragDeltaRef.current = null;
@@ -739,32 +765,25 @@ export default function Main() {
         // safe to commit now
         const { index, handleIn, dx, dy } = dragDeltaRef.current;
 
-        commit(prevShapes =>
-            prevShapes.map((shape, si) => {
-                if (si !== selectedShapeIndex) return shape;
+        commit(prev => {
+            const path = prev.paths[selectedPathId];
+            if (!path) return prev;
 
-                return {
-                    ...shape,
-                    paths: shape.paths.map((path, pi) => {
-                        if (pi !== selectedPathIndex) return path;
+            const pointId = path.pointIds[index];
+            const p = prev.points[pointId];
+            if (!p) return prev;
 
-                        return {
-                            ...path,
-                            points: path.points.map((p, i) => {
-                                if (i !== index) return p;
+            const updatedPoint: Point = {
+                ...p,
+                in: handleIn && p.in ? { x: p.in.x + dx, y: p.in.y + dy } : p.in,
+                out: !handleIn && p.out ? { x: p.out.x + dx, y: p.out.y + dy } : p.out
+            };
 
-                                return {
-                                    ...p,
-                                    in: handleIn && p.in ? { x: p.in.x + dx, y: p.in.y + dy } : p.in,
-                                    out: !handleIn && p.out ? { x: p.out.x + dx, y: p.out.y + dy } : p.out
-                                };
-                            })
-                        };
-                    })
-                };
-            })
-        );
-
+            return {
+                ...prev,
+                points: { ...prev.points, [pointId]: updatedPoint }
+            };
+        });
         dragDeltaRef.current = null;
         draggingRef.current = null;
         window.removeEventListener("mousemove", onHandleMouseMove);
@@ -774,17 +793,17 @@ export default function Main() {
     // POINT HANDLES
     // =================================================================================================================
 
-    function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, i: number) {
+    function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, id: string) {
         const knob = e.currentTarget as HTMLDivElement;
         knob.style.pointerEvents = "none";
         knob.style.display = "none";
 
         if (tool === "Delete") {
-            handleRemovePoint(i)
+            handleRemovePoint(id)
         };
         if (tool === "Select" || tool === "Move" || tool === "Insert") {
-            startDragging(i);
-            setSelectedPointIndex(i);
+            startDragging(id);
+            setSelectedPointId(id);
         }
 
         function onMouseUp() {
@@ -814,10 +833,10 @@ export default function Main() {
             selectShapeAt(ctx, screenX, screenY);
         }
         else if (tool === "Insert") {
-            let targetIndex = selectedShapeIndex;
+            let targetId = selectedShapeId;
             if (e.shiftKey) {
-                AddNewShape("empty"); // this should also select it
-                targetIndex = history.present.shapes.length;
+                const newShape = AddNewShape("empty"); // this should also select it
+                targetId = newShape.id;
 
             }
             else if (e.ctrlKey) {
@@ -825,12 +844,13 @@ export default function Main() {
             }
             else {
                 ClearOverlayCanvas();
-                handleCreatePoint(e, targetIndex);
+                if (targetId)
+                    handleCreatePoint(e, targetId);
 
             }
         }
 
-        if (selectedShapeIndex !== -1) { // this doesnt work because selectedshapeindex is never -1 so drag is always set on click
+        if (selectedShapeId !== null) { // this doesnt work because selectedshapeindex is never -1 so drag is always set on click
 
             dragOffset.current = { x: screenX, y: screenY };
         }
@@ -849,52 +869,57 @@ export default function Main() {
 
         if (changeDetected()) {
 
-            commit(() => history.present.shapes);
+            commit(prev => prev);
         }
     }
 
     function selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
-        const prevShape = selectedShapeIndex;
-        const prevPath = selectedPathIndex;
+        const prevShapeId = selectedShapeId;
+        const prevPathId = selectedPathId;
 
-        setSelectedShapeIndex(-1);
-        setSelectedPathIndex(-1);
-        setSelectedPointIndex(-1);
+        setSelectedShapeId(null);
+        setSelectedPathId(null);
+        setSelectedPointId(null);
 
-        for (let i = history.present.shapes.length - 1; i >= 0; i--) {
-            buildPath(ctx, history.present.shapes[i]);
+        // iterate shapes in reverse order
+        const shapesArray = Object.values(history.present.shapes);
+        for (let i = shapesArray.length - 1; i >= 0; i--) {
+            const shape = shapesArray[i];
+            buildPath(ctx, shape, history.present.paths, history.present.points);
 
             if (ctx.isPointInPath(x, y)) {
+                setSelectedShapeId(shape.id);
 
-                setSelectedShapeIndex(i);
+                let nextPathId: string | null = null;
 
-                let nextPathIndex = 0;
-
-                if (i === prevShape) {
-                    // cycle to next path
-                    const pathCount = history.present.shapes[i].paths.length;
-                    nextPathIndex = (prevPath + 1) % pathCount;
+                if (shape.id === prevShapeId && prevPathId) {
+                    const pathIds = shape.pathIds;
+                    const index = pathIds.indexOf(prevPathId);
+                    nextPathId = pathIds[(index + 1) % pathIds.length];
+                } else {
+                    // default to first path
+                    nextPathId = shape.pathIds[0] ?? null;
                 }
 
-                setSelectedPathIndex(nextPathIndex);
+                setSelectedPathId(nextPathId);
                 break;
             }
         }
     }
-
-    function buildPath(ctx: CanvasRenderingContext2D, shape: Shape) {
+    function buildPath(ctx: CanvasRenderingContext2D, shape: Shape, paths: Record<string, Path>, points: Record<string, Point>) {
         ctx.beginPath();
-        for (let index = 0; index < shape.paths.length; index++) {
+        shape.pathIds.forEach(pathId => {
+            const path = paths[pathId];
+            if (!path) return;
 
-            const points = shape.paths[index].points;
+            const pts = path.pointIds.map(pid => points[pid]).filter(Boolean);
+            if (pts.length === 0) return;
 
-            if (!points || points.length === 0) continue;
+            ctx.moveTo(pts[0].x, pts[0].y);
 
-            ctx.moveTo(points[0].x, points[0].y);
-
-            for (let i = 1; i < points.length; i++) {
-                const prev = points[i - 1];
-                const curr = points[i];
+            for (let i = 1; i < pts.length; i++) {
+                const prev = pts[i - 1];
+                const curr = pts[i];
                 ctx.bezierCurveTo(
                     prev.out?.x ?? prev.x,
                     prev.out?.y ?? prev.y,
@@ -903,9 +928,9 @@ export default function Main() {
                     curr.x, curr.y
                 );
             }
-            if (shape.cyclic && points.length > 1) {
-                const last = points[points.length - 1];
-                const first = points[0];
+            if (shape.cyclic && pts.length > 1) {
+                const last = pts[pts.length - 1];
+                const first = pts[0];
 
                 ctx.bezierCurveTo(
                     last.out?.x ?? last.x,
@@ -917,174 +942,182 @@ export default function Main() {
                 );
                 ctx.closePath(); // optional for closed shapes
             }
-        }
+        });
     }
 
 
-    function MovePointByIndex(pointIndex: number, newPoint: Point) {
-
+    function MovePointById(pointId: string, newPoint: Point) {
         if (changeDetected()) {
-
-
-            commit(prevShapes =>
-                prevShapes.map((shape, i) => {
-                    if (i !== selectedShapeIndex) return shape;
-
-                    // copy all paths
-                    const newPaths = shape.paths.map((path, pi) => {
-                        if (pi !== selectedPathIndex) return path;
-
-                        // copy points, replacing the moved point
-                        const newPoints = path.points.map((pt, pj) =>
-                            pj === pointIndex ? { x: newPoint.x, y: newPoint.y } : { ...pt }
-                        );
-
-                        return { ...path, points: newPoints };
-                    });
-
-                    return { ...shape, paths: newPaths };
-                })
-            );
-        }
-
-        setSelectedPointIndex(pointIndex);
-    }
-
-    function handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>, targetIndex: number) {
-        if (!canvasRef.current) return;
-        let shapeIndex = targetIndex;
-        let pathIndex = selectedPathIndex;
-        let _shape = history.present.shapes[shapeIndex];
-
-        // if no shape exists, create one
-        if (!_shape) {
-            const newShape = CreateBaseShape();
-
-
             commit(prev => {
-                const newShapes = [...prev, newShape];
-                // update selection immediately for next render
-                setSelectedShapeIndex(newShapes.length - 1);
-                setSelectedPathIndex(0);
+                const p = prev.points[pointId];
+                if (!p) return prev;
 
-                // update local variables for this function
-                _shape = newShape;
-                shapeIndex = newShapes.length - 1;
-                pathIndex = 0;
-
-                return newShapes;
+                return {
+                    ...prev,
+                    points: {
+                        ...prev.points,
+                        [pointId]: {
+                            ...p,
+                            x: newPoint.x,
+                            y: newPoint.y
+                        }
+                    }
+                };
             });
         }
 
-        const path = _shape.paths[pathIndex];
+        setSelectedPointId(pointId);
+    }
+
+    function handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>, targetShapeId: string) {
+        if (!canvasRef.current) return;
+        if (!selectedPathId) return;
+
+        let shapeId = targetShapeId;
+        let pathId = selectedPathId;
+        let shape = history.present.shapes[shapeId];
+
+
+        // if no shape exists, create one
+        if (!shape) {
+            const newShape = CreateBaseShape(); // should generate id + empty pathIds
+            commit(prev => {
+                return {
+                    ...prev,
+                    shapes: { ...prev.shapes, [newShape.id]: newShape }
+                };
+            });
+
+            shape = newShape;
+            shapeId = newShape.id;
+            pathId = newShape.pathIds[0]; // first path id
+            setSelectedShapeId(shapeId);
+            setSelectedPathId(pathId);
+        }
+
+        const path = history.present.paths[pathId];
         if (!path) return;
 
         const cam = cameraRef.current;
+        const cmp = getCanvasMousePos(e, canvasRef.current);
+        let x = cmp.x / cam.zoom + cam.x;
+        let y = cmp.y / cam.zoom + cam.y;
 
-        var cmp = getCanvasMousePos(e, canvasRef.current)
-
-        const canvasX = cmp.x;
-        const canvasY = cmp.y;
-
-        let x = canvasX / cam.zoom + cam.x;
-        let y = canvasY / cam.zoom + cam.y;
-
+        // create the new point
         let newPoint: Point;
 
         if (selectedSegment !== -1) {
-            const n = path.points.length;
-            const start = path.points[selectedSegment];
-            const end = path.points[(selectedSegment + 1) % n];
+            // insert along existing segment
+            const n = path.pointIds.length;
+            const start = history.present.points[path.pointIds[selectedSegment]];
+            const end = history.present.points[path.pointIds[(selectedSegment + 1) % n]];
 
-            const c1 = start.out ?? start; // fallback if null
+            const c1 = start.out ?? start;
             const c2 = end.in ?? end;
 
-            // get midpoint along cubic Bezier
-            newPoint = cubicBezierPoint(0.5, start, c1, c2, end);
+            const newPointId = crypto.randomUUID();
+            newPoint = { id: newPointId, ...cubicBezierPoint(0.5, start, c1, c2, end) };
 
-            insertPointAt(selectedSegment, newPoint.x, newPoint.y);
-            setSelectedPointIndex(selectedSegment + 1);
-            startDragging(selectedSegment + 1);
+            // insert point in points table
+            commit(prev => {
+                const points = { ...prev.points, [newPointId]: newPoint };
+                const newPath = {
+                    ...prev.paths[pathId],
+                    pointIds: [
+                        ...prev.paths[pathId].pointIds.slice(0, selectedSegment + 1),
+                        newPointId,
+                        ...prev.paths[pathId].pointIds.slice(selectedSegment + 1)
+                    ]
+                };
+
+                return {
+                    ...prev,
+                    points,
+                    paths: { ...prev.paths, [pathId]: newPath }
+                };
+            });
+
+            setSelectedPointId(newPoint.id);
+            startDragging(newPoint.id);
 
         } else {
+            // insert at end, possibly snap to grid
             if (snapToGrid) {
-                if (!canvasRef.current) return;
-
                 const spacing = 1000 / gridSubdivions;
-
                 x = Math.round(x / spacing) * spacing;
                 y = Math.round(y / spacing) * spacing;
             }
 
-            newPoint = { x, y };
+            const newPointId = crypto.randomUUID();
+            newPoint = { x, y, id: newPointId };
 
+            commit(prev => {
+                const points = { ...prev.points, [newPointId]: newPoint };
+                const newPath = { ...prev.paths[pathId], pointIds: [...prev.paths[pathId].pointIds, newPointId] };
 
-            commit(prev =>
-                prev.map((s, i) => {
-                    if (i !== shapeIndex) return s;
+                return {
+                    ...prev,
+                    points,
+                    paths: { ...prev.paths, [pathId]: newPath }
+                };
+            });
 
-                    const newPaths = [...s.paths];
-                    const currentPath = newPaths[pathIndex];
-                    const newPoints = [...currentPath.points, newPoint];
-
-                    newPaths[pathIndex] = { ...currentPath, points: newPoints };
-                    return { ...s, paths: newPaths };
-                })
-            );
-
-            setSelectedPointIndex(path.points.length);
-            startDragging(path.points.length);
+            setSelectedPointId(newPointId);
+            startDragging(newPointId);
         }
     }
 
-    function insertPointAt(index: number, x: number, y: number) {
-        const newPoint = { x, y };
+    // function insertPointAt(index: number, x: number, y: number) {
+    //     const newPoint = { x, y };
 
 
-        commit(prev =>
-            prev.map((s, i) => {
-                if (i !== selectedShapeIndex) return s;
+    //     commit(prev =>
+    //         prev.map((s, i) => {
+    //             if (i !== selectedShapeId) return s;
 
-                const newPaths = [...s.paths];
-                const currentPath = newPaths[selectedPathIndex];
+    //             const newPaths = [...s.pathIds];
+    //             const currentPath = newPaths[selectedPathId];
 
-                const newPoints = [...currentPath.points];
-                newPoints.splice(index + 1, 0, newPoint);
+    //             const newPoints = [...currentPath.points];
+    //             newPoints.splice(index + 1, 0, newPoint);
 
-                newPaths[selectedPathIndex] = {
-                    ...currentPath,
-                    points: newPoints
-                };
+    //             newPaths[selectedPathId] = {
+    //                 ...currentPath,
+    //                 points: newPoints
+    //             };
 
-                return { ...s, paths: newPaths };
-            })
-        );
-    }
+    //             return { ...s, pathIds: newPaths };
+    //         })
+    //     );
+    // }
 
 
     function handleKnobSize(e: React.ChangeEvent<HTMLInputElement, Element>) {
         setKnobSize(Number(e.target.value))
     }
 
-    function handleSelectPoint(e: React.ChangeEvent<HTMLInputElement, HTMLInputElement>): void {
+    function handleSelectPoint(e: React.ChangeEvent<HTMLInputElement>): void {
+        if (!selectedPathId) return;
 
-        var index = Number(e.target.value);
-        var points = shape.paths[selectedPathIndex].points.length;
-        index = (index + points) % points;
-        if (shape && shape.paths[selectedPathIndex].points.length > index && index > -1) {
+        const path = paths[selectedPathId];
+        if (!path) return;
 
-            setSelectedPointIndex(index)
+        const pointCount = path.pointIds.length;
+        let index = Number(e.target.value);
+        index = (index + pointCount) % pointCount; // wrap around cyclically
+
+        if (index >= 0 && index < pointCount) {
+            const pointId = path.pointIds[index];
+            setSelectedPointId(pointId); // select by ID, not index
         }
     }
 
-    function startDragging(index: number) {
+    function startDragging(id: string) {
         if (!canvasRef.current) return;
 
-        if (selectedShapeIndex === -1 || selectedPathIndex === -1) return;
+        if (selectedShapeId === null || selectedPathId === null) return;
 
-        const shape = history.present.shapes[selectedShapeIndex];
-        const path = shape.paths[selectedPathIndex];
-        const startPoint = path.points[index];
+        const startPoint = points[id];
 
         let offsetX = 0;
         let offsetY = 0;
@@ -1112,10 +1145,10 @@ export default function Main() {
                 y = Math.round(y / spacing) * spacing;
             }
 
-            const dx = x - path.points[index].x;
-            const dy = y - path.points[index].y;
+            const dx = x - points[id].x;
+            const dy = y - points[id].y;
 
-            const p = path.points[index];
+            const p = points[id];
 
             p.x = x;
             p.y = y;
@@ -1185,10 +1218,11 @@ export default function Main() {
         if (!ctx) return;
 
 
-        ExportShape(selectedExportScale, fileName, history.present.shapes, frame);
+        ExportShape(selectedExportScale, fileName, shapes, paths, points, frame);
     }
+
     function handleSave(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
-        SaveFile(fileName, history.present.shapes, showGrid, snapToGrid, gridSubdivions);
+        SaveFile(fileName, shapeOrder, shapes, paths, points, showGrid, snapToGrid, gridSubdivions);
     }
     function handleLoad(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         LoadFile(setFileName, commit, setShowGrid, setSnapToGrid, setGridSubdivisions);
@@ -1199,58 +1233,88 @@ export default function Main() {
     }
 
     function AddNewShape(shapeName: string, shape: Shape | null = null): Shape {
+        // create new shape
+        let newShape: Shape = shape ?? CreateBaseShape();
 
-        let newShape: Shape = CreateBaseShape();
-        if (shape === null) {
-
-            if (shapeName === "empty") {
-                newShape = CreateBaseShape();
-            }
-            if (shapeName === "circle") {
-                newShape = CreateBaseShape([CreateCircle()]);
-            }
-            if (shapeName === "square") {
-                newShape = CreateBaseShape([CreateSquare()]);
-            }
-            if (shapeName === "triangle") {
-                newShape = CreateBaseShape([CreateTriangle()]);
-            }
-        }
-        else {
-            newShape = shape;
-
-            // this was to add an offset to the duplicated shape but its adding it to the main shape too and i cant be arsed right now
-            // const offset = { x: 50, y: 50 };
-            // newShape.paths.forEach(pa => pa.points.forEach(po => { po.x += offset.x; po.y += offset.y; }));
+        if (!shape) {
+            if (shapeName === "circle") newShape = CreateBaseShape([CreateCircle()]);
+            else if (shapeName === "square") newShape = CreateBaseShape([CreateSquare()]);
+            else if (shapeName === "triangle") newShape = CreateBaseShape([CreateTriangle()]);
         }
 
-        const newIndex = history.present.shapes.length;
+        // build tables for the shape’s paths and points
+        const shapePaths: Record<string, Path> = {};
+        const shapePoints: Record<string, Point> = {};
 
-        commit(prev => [...prev, newShape]);
+        newShape.pathIds.forEach(pathId => {
+            const path = CreateEmptyPath(); // or pull from somewhere if you have default paths
+            path.id = pathId;
+            shapePaths[pathId] = path;
 
-        setSelectedShapeIndex(newIndex);
-        setSelectedPathIndex(0);
+            path.pointIds.forEach(pid => {
+                const pt = { id: "", x: 0, y: 0 }; // or pull from default points
+                pt.id = pid;
+                shapePoints[pid] = pt;
+            });
+        });
+
+        commit(prev => ({
+            ...prev,
+            shapes: { ...prev.shapes, [newShape.id]: newShape },
+            paths: { ...prev.paths, ...shapePaths },
+            points: { ...prev.points, ...shapePoints }
+        }));
+
+        setSelectedShapeId(newShape.id);
+        setSelectedPathId(null);
+
         return newShape;
     }
 
     function DeleteSelectedShape(): void {
-        if (selectedShapeIndex === -1) return;
-        commit(prev => [...prev.filter(s => s !== shape)]);
-        setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
+        if (selectedShapeId === null) return;
+        commit((prev: HistoryState) => {
+            const newShapes = { ...prev.shapes };
+            delete newShapes[selectedShapeId];
+            return {
+                ...prev, shapes: newShapes
+            };
+        });
+        setSelectedShapeId(null);
         setSelectedSegment(0);
     }
-    function DeleteShape(index: number): void {
-        if (index === -1) return;
-        commit(prev => [...prev.filter((_s, i) => i !== index)]);
-        setSelectedShapeIndex(-1);
+
+    function DeleteShape(id: string): void {
+        if (id === null) return;
+        commit((prev: HistoryState) => {
+            const newShapes = { ...prev.shapes };
+            delete newShapes[id];
+            return {
+                ...prev, shapes: newShapes
+            };
+        });
+        setSelectedShapeId(null);
         setSelectedSegment(0);
     }
 
     // update shape helper
     function updateSelectedShape(updater: (shape: Shape) => Shape) {
-        commit(prev =>
-            prev.map((s, i) => (i === selectedShapeIndex ? updater(s) : s))
-        );
+        if (!selectedShapeId) return;
+
+        commit((prev: HistoryState) => {
+            const shape = prev.shapes[selectedShapeId];
+            if (!shape) return prev;
+
+            const newShape = updater(shape);
+
+            const newShapes = { ...prev.shapes };
+            newShapes[selectedShapeId] = newShape;
+
+            return {
+                ...prev,
+                shapes: newShapes
+            };
+        });
     }
     // function updateShape(index: number, updater: (shape: Shape) => Shape) {
     //     commit(prev =>
@@ -1261,56 +1325,105 @@ export default function Main() {
     function handleClickAddNewPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         AddNewPath();
     }
+
     function AddNewPath(): void {
-        if (history.present.shapes.length < 1) return;
-        commit(prev =>
-            prev.map((s, i) => {
-                if (i !== selectedShapeIndex) return s;
+        if (selectedShapeId === null) return;
 
-                const newPaths = [
-                    ...s.paths,
-                    { points: [], isHole: true }
-                ];
-                return { ...s, paths: newPaths }
-            })
+        commit((prev: HistoryState) => {
 
-        );
-        setSelectedPathIndex(history.present.shapes[selectedShapeIndex].paths.length);
+            const shape = prev.shapes[selectedShapeId];
+            if (!shape) return prev;
+
+            const newPath: Path = ({
+                id: crypto.randomUUID(),
+                isHole: false,
+                pointIds: []
+            });
+
+            const newShape: Shape = {
+                ...shape, pathIds: [...shape.pathIds, newPath.id]
+            }
+
+            const newShapes = { ...prev.shapes };
+            newShapes[selectedShapeId] = newShape;
+
+            const newPaths = { ...prev.paths };
+            newPaths[newPath.id] = newPath;
+
+            setSelectedPathId(newPath.id);
+
+            return {
+                ...prev,
+                shapes: newShapes,
+                paths: newPaths
+            }
+        });
     }
-    function DeleteSelectedPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        commit(prev =>
-            prev.map((s, i) => {
-                if (i !== selectedShapeIndex) return s;
+    function DeleteSelectedPath(): void {
+        if (!selectedShapeId || !selectedPathId) return;
 
-                const newPaths = [
-                    ...s.paths.filter((_p, i) => i !== selectedPathIndex)
-                ];
-                return { ...s, paths: newPaths }
-            })
-        );
-        setSelectedPathIndex(prev => Math.max(prev - 1, 0));
-    }
-    function DeletePath(shapeIndex: number, pathIndex: number): void {
-        commit(prev =>
-            prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
+        commit((prev: HistoryState) => {
 
-                const newPaths = [
-                    ...s.paths.filter((_p, i) => i !== pathIndex)
-                ];
-                return { ...s, paths: newPaths }
-            })
-        );
-        setSelectedPathIndex(prev => Math.max(prev - 1, 0));
+            const shape = prev.shapes[selectedShapeId];
+            if (!shape) return prev;
+
+            const newPathIds = shape.pathIds.filter(id => id !== selectedPathId);
+
+            const newShape: Shape = {
+                ...shape,
+                pathIds: newPathIds
+            };
+
+            const newShapes = { ...prev.shapes };
+            newShapes[selectedShapeId] = newShape;
+
+            const newPaths = { ...prev.paths };
+            delete newPaths[selectedPathId];
+
+            return {
+                ...prev,
+                shapes: newShapes,
+                paths: newPaths
+            };
+        });
+
+        setSelectedPathId(null);
     }
-    function HideShape(i: number, hide: boolean): void {
+    function DeletePath(shapeId: string, pathId: string): void {
+
+        commit((prev: HistoryState) => {
+
+            const shape = prev.shapes[shapeId];
+            if (!shape) return prev;
+
+            const newShape: Shape = {
+                ...shape,
+                pathIds: shape.pathIds.filter(id => id !== pathId)
+            };
+
+            const newShapes = { ...prev.shapes };
+            newShapes[shapeId] = newShape;
+
+            const newPaths = { ...prev.paths };
+            delete newPaths[pathId];
+
+            return {
+                ...prev,
+                shapes: newShapes,
+                paths: newPaths
+            };
+        });
+
+        setSelectedPathId(null);
+    }
+    function HideShape(id: string, hide: boolean): void {
         if (hide) {
 
-            setHiddenShapeIndicies(prev => [...prev, i]);
+            setHiddenShapeIds(prev => [...prev, id]);
         }
         else {
 
-            setHiddenShapeIndicies(prev => prev.filter(p => p !== i));
+            setHiddenShapeIds(prev => prev.filter(p => p !== id));
         }
     }
     // function HidePath(i: number, hide: boolean): void {
@@ -1325,44 +1438,57 @@ export default function Main() {
     // }
 
     function moveForward() {
-        commit(prev => {
-            const index = selectedShapeIndex;
-            if (index === -1 || index >= prev.length - 1) return prev;
+        commit((prev: HistoryState) => {
 
-            const copy = [...prev];
-            [copy[index], copy[index + 1]] =
-                [copy[index + 1], copy[index]];
+            const id = selectedShapeId;
+            if (!id) return prev;
 
-            setSelectedShapeIndex(index + 1);
-            return copy;
+            const index = prev.shapeOrder.indexOf(id);
+            if (index === -1 || index === prev.shapeOrder.length - 1) return prev;
+
+            const newOrder = [...prev.shapeOrder];
+
+            [newOrder[index], newOrder[index + 1]] =
+                [newOrder[index + 1], newOrder[index]];
+
+            setSelectedShapeId(id);
+
+            return {
+                ...prev,
+                shapeOrder: newOrder
+            };
         });
     }
     function moveBackward() {
-        commit(prev => {
-            const index = selectedShapeIndex;
+        commit((prev: HistoryState) => {
+
+            const id = selectedShapeId;
+            if (!id) return prev;
+
+            const index = prev.shapeOrder.indexOf(id);
             if (index <= 0) return prev;
 
-            const copy = [...prev];
-            [copy[index], copy[index - 1]] =
-                [copy[index - 1], copy[index]];
+            const newOrder = [...prev.shapeOrder];
 
-            setSelectedShapeIndex(index - 1);
-            return copy;
+            [newOrder[index], newOrder[index - 1]] =
+                [newOrder[index - 1], newOrder[index]];
+
+            return {
+                ...prev,
+                shapeOrder: newOrder
+            };
         });
     }
 
     // type Commit = (updater: (prev: Shape[]) => Shape[]) => void;
 
-    function commit(updater: (prevShapes: Shape[]) => Shape[]) {
+    function commit(updater: (prev: HistoryState) => HistoryState) {
         setHistory(prev => {
-            const newShapes = updater(prev.present.shapes).map(s => ({
-                ...s,
-                paths: s.paths.map(p => ({ ...p, points: [...p.points] }))
-            }));
+            const newPresent = updater(prev.present);
 
             return {
-                past: [...prev.past, JSON.parse(JSON.stringify(prev.present))], // deep copy
-                present: { shapes: newShapes },
+                past: [...prev.past, prev.present], // shallow copy of previous present
+                present: newPresent,
                 future: []
             };
         });
@@ -1394,19 +1520,48 @@ export default function Main() {
             };
         });
     }
-    function setShapeName(name: string, index: number): void {
-        commit(prev =>
-            prev.map((p, i) =>
-                i === index ? { ...p, name } : p
-            )
-        );
+    function setShapeName(name: string, id: string): void {
+        commit((prev: HistoryState) => {
+            const shape = prev.shapes[id];
+            if (!shape) return prev;
+
+            const newShape = { ...shape, name };
+
+            const newShapes = {
+                ...prev.shapes,
+                [id]: newShape
+            };
+
+            return {
+                ...prev,
+                shapes: newShapes
+            }
+        });
+    }
+    function getShapeIdOfPath(pathId: string): string | null {
+        const shapes = history.present.shapes;
+        for (const shapeId in shapes) {
+            if (shapes[shapeId].pathIds.includes(pathId)) {
+                return shapeId;
+            }
+        }
+        return null; // not found
     }
 
     function clearDocument(): void {
-        setHistory({ past: [], present: { shapes: [] }, future: [] });
-        setSelectedPointIndex(-1);
-        setSelectedPathIndex(-1);
-        setSelectedShapeIndex(-1)
+        setHistory({
+            past: [],
+            present: {
+                shapeOrder: [],
+                shapes: {},
+                paths: {},
+                points: {}
+            },
+            future: []
+        });
+        setSelectedPointId(null);
+        setSelectedPathId(null);
+        setSelectedShapeId(null);
         localStorage.removeItem("Session");
         if (canvasRef.current) ClearCanvas(canvasRef.current.getContext("2d")!);
     }
@@ -1427,7 +1582,7 @@ export default function Main() {
         const canvas = canvasRef.current;
         if (!canvas || !shape) return;
 
-        const center = getShapeCenter(shape);
+        const center = getShapeCenter(shape, paths, points);
         const zoom = cameraRef.current.zoom;
 
         cameraRef.current.x = center.x - canvas.width / (2 * zoom);
@@ -1459,22 +1614,22 @@ export default function Main() {
 
                     <Panel title="Shapes">
                         <div className="flex flex-col gap-2">
-                            {history.present && history.present.shapes.map((s, i) => {
+                            {history.present && selectedShapeId && Object.values(history.present.shapes).map((s) => {
                                 return (
-                                    <div key={i} className="flex flex-row gap-2 justify-between">
-                                        <button className={`${i === selectedShapeIndex ? "selected" : ""}`} onClick={() => setSelectedShapeIndex(i)}>{s.name || "shape"} paths: {s.paths.length}</button>
-                                        <button title="Delete" onClick={() => DeleteShape(i)}><i className="fa fa-x"></i></button>
-                                        <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
+                                    <div key={s.id} className="flex flex-row gap-2 justify-between">
+                                        <button className={`${s.id === selectedShapeId ? "selected" : ""}`} onClick={() => setSelectedShapeId(s.id)}>{s.name || "shape"} paths: {s.pathIds.length}</button>
+                                        <button title="Delete" onClick={() => DeleteShape(s.id)}><i className="fa fa-x"></i></button>
+                                        <button title="Hide" className={`${!hiddenShapeIds.includes(s.id) ? "selected" : ""}`} onClick={() => HideShape(s.id, !hiddenShapeIds.includes(s.id))}><i className="fa fa-eye"></i></button>
                                     </div>
                                 )
                             })}
                             <br />
                             <h2>Paths</h2>
-                            {shape && shape.paths.map((s, i) => {
+                            {history.present && history.present.paths && Object.values(history.present.paths).map((p) => {
                                 return (
-                                    <div key={i} className="flex flex-row gap-2 justify-between">
-                                        <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {s.points.length}</button>
-                                        <button title="Delete" onClick={() => DeletePath(history.present.shapes.indexOf(shape), i)}><i className="fa fa-x"></i></button>
+                                    <div key={p.id} className="flex flex-row gap-2 justify-between">
+                                        <button className={`${p.id === selectedPathId ? "selected" : ""}`} onClick={() => setSelectedPathId(p.id)}>Path_{p.id} points: {p.pointIds.length}</button>
+                                        <button title="Delete" onClick={() => { const shapeId = getShapeIdOfPath(p.id); if (shapeId) DeletePath(shapeId, p.id) }}><i className="fa fa-x"></i></button>
                                         {/* <button className={`${!hiddenPathIndicies.includes(i) ? "selected" : ""}`} onClick={() => HidePath(i, !hiddenPathIndicies.includes(i))}><i className="fa fa-eye"></i></button> */}
                                     </div>
                                 )
@@ -1500,19 +1655,22 @@ export default function Main() {
                         {/* Knobs */}
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
 
-                            {showKnobs && !dragging &&
-                                shape && shape.paths[selectedPathIndex]?.points.map((p, i) => {
+                            {showKnobs && !dragging && selectedPathId &&
+                                shape && paths[selectedPathId]?.pointIds.map((pointId, i) => {
+                                    const p = points[pointId];
+                                    if (!p) return null;
+
                                     if (canvasRect == null) return;
 
-                                    const selected = selectedPointIndex === i;
+                                    const selected = selectedPointId === pointId;
                                     if (!canvasRef.current) return;
 
                                     const pointScreen = worldToScreen(p.x, p.y, cameraRef.current, canvasRef.current);
                                     const inScreen = p.in && worldToScreen(p.in.x, p.in.y, cameraRef.current, canvasRef.current);
                                     const outScreen = p.out && worldToScreen(p.out.x, p.out.y, cameraRef.current, canvasRef.current);
                                     return (
-                                        <div key={i}>
-                                            <Knob x={pointScreen.x} y={pointScreen.y} i={i} selected={selected} size={knobSize} tool={tool} handleKnobMouseDown={handleKnobMouseDown}></Knob>
+                                        <div key={p.id}>
+                                            <Knob x={pointScreen.x} y={pointScreen.y} id={pointId} selected={selected} size={knobSize} tool={tool} handleKnobMouseDown={handleKnobMouseDown}></Knob>
 
                                             {
                                                 inScreen && selected &&
@@ -1593,14 +1751,14 @@ export default function Main() {
                             {/* <input type="range" value={history.past.length} min={0} max={history.past.length + history.future.length}></input> */}
 
                         </Panel>
-                        {selectedPointIndex !== -1 &&
+                        {selectedPointId !== null &&
                             <Panel title="Selected point">
                                 <div className="flex flex-row gap-2 ">
-                                    <input className="w-[10ch]" type="number" value={selectedPointIndex} onChange={handleSelectPoint}></input>
-                                    <button title="Delete point" onClick={() => handleRemovePoint(selectedPointIndex)}><i className="fa-solid fa-x"></i></button>
-                                    <button title="Curve point" onClick={() => handleAddCurveToPoint(selectedPointIndex)}><i className="fa-solid fa-bezier-curve"></i></button>
+                                    <input className="w-[10ch]" type="number" value={selectedPointId} onChange={handleSelectPoint}></input>
+                                    <button title="Delete point" onClick={() => handleRemovePoint(selectedPointId)}><i className="fa-solid fa-x"></i></button>
+                                    <button title="Curve point" onClick={() => handleAddCurveToPoint(selectedPointId)}><i className="fa-solid fa-bezier-curve"></i></button>
                                 </div>
-                                {selectedPointIndex !== -1 && selectedPoint && shape &&
+                                {selectedPointId !== null && selectedPoint && shape &&
                                     (
                                         <div className="flex flex-row gap-2">
                                             <div className="flex flex-row gap-2">
@@ -1610,9 +1768,9 @@ export default function Main() {
                                                     type="number"
                                                     value={selectedPoint.x.toFixed(3)}
                                                     onChange={(e) =>
-                                                        MovePointByIndex(
-                                                            selectedPointIndex,
-                                                            { x: Number(e.target.value), y: selectedPoint.y }
+                                                        MovePointById(
+                                                            selectedPointId,
+                                                            { id: selectedPoint.id, x: Number(e.target.value), y: selectedPoint.y }
                                                         )}
                                                 ></input>
                                             </div>
@@ -1623,9 +1781,9 @@ export default function Main() {
                                                     type="number"
                                                     value={selectedPoint.y.toFixed(3)}
                                                     onChange={(e) =>
-                                                        MovePointByIndex(
-                                                            selectedPointIndex,
-                                                            { x: selectedPoint.x, y: Number(e.target.value) }
+                                                        MovePointById(
+                                                            selectedPointId,
+                                                            { id: selectedPoint.id, x: selectedPoint.x, y: Number(e.target.value) }
                                                         )}
                                                 ></input>
                                             </div>
@@ -1643,20 +1801,32 @@ export default function Main() {
                             </div>
                         </Panel>
                         {
-                            shape &&
+                            shape && selectedShapeId &&
 
                             <Panel title="Shape">
                                 {/* <p>Shapes: {history.present.shapes.length}</p> */}
-                                <p>Selected shape:
-                                    <input className="ml-2 w-[10ch]" type="number" value={selectedShapeIndex} min={0} max={history.present.shapes.length - 1} onChange={(e) => { setSelectedShapeIndex(Number(e.target.value)); setSelectedPathIndex(0); setSelectedPointIndex(0); }}></input>
-                                </p>
-                                <label>Name: <input type="text" value={shape.name} onChange={(e) => setShapeName(e.target.value, selectedShapeIndex)}></input></label>
-                                <button onClick={(_e) => AddNewShape("", CloneShape(shape))}>Duplicate</button>
+                                <p>Selected shape:</p>
+                                <p className="ml-2 w-[10ch]" >{selectedShapeId}</p>
+                                <p>add name here</p>
+                                <label>Name: <input type="text" value={shape.name} onChange={(e) => setShapeName(e.target.value, selectedShapeId)}></input></label>
+                                <button onClick={(_e) => {
+                                    const cloned = CloneShape(shape, paths, points);
+                                    AddNewShape("", cloned.shape);
+
+                                    // merge cloned paths and points into your state
+                                    commit(prev => ({
+                                        ...prev,
+                                        paths: { ...prev.paths, ...cloned.paths },
+                                        points: { ...prev.points, ...cloned.points }
+                                    }));
+                                }}>
+                                    Duplicate
+                                </button>
                                 <div className="flex flex-row gap-2">
                                     <p>Order:</p>
                                     <button onClick={moveForward}><i className="fa fa-arrow-up"></i></button>
                                     <button onClick={moveBackward}><i className="fa fa-arrow-down"></i></button>
-                                    {history.present.shapes.length > 0 && selectedShapeIndex !== -1 &&
+                                    {Object.values(history.present.shapes).length > 0 && selectedShapeId !== null &&
                                         <button title="Delete shape" onClick={DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
                                     }
                                 </div>
@@ -1664,10 +1834,9 @@ export default function Main() {
                         }
                         {shape &&
                             <Panel title="Paths">
-                                <p>Paths: {shape.paths.length}</p>
-                                <p>Selected path:
-                                    <input className="ml-2 w-[10ch]" type="number" value={selectedPathIndex} min={0} max={history.present.shapes[selectedShapeIndex]?.paths.length - 1} onChange={(e) => setSelectedPathIndex(Number(e.target.value))}></input>
-                                </p>
+                                <p>Paths: {shape.pathIds.length}</p>
+                                <p>Selected path:</p>
+                                <p className="ml-2 w-[10ch]" >{selectedPathId}</p>
                                 <div className="flex flex-row gap-2">
                                     <button title="Add path" onClick={handleClickAddNewPath}><i className="fa fa-circle-plus"></i></button>
                                     <button title="Delete path" onClick={DeleteSelectedPath}><i className="fa fa-circle-minus"></i></button>
@@ -1751,57 +1920,59 @@ export default function Main() {
                             </Panel>
                         }
                         <Panel title="Colors">
-
                             <div className="panel2content flex-row!">
                                 <div className="flex flex-col">
-
                                     <h2>Fill</h2>
-                                    {Array.from(
-                                        new Set(history.present.shapes.map(shape => shape.fillColor))
-                                    ).map((color, i) => (
-                                        <input
-                                            key={i}
-                                            className="colorSelect"
-                                            type="color"
-                                            value={color}
-                                            onChange={(e) => {
-                                                const newColor = e.target.value;
-                                                commit(prevShapes =>
-                                                    prevShapes.map(s =>
-                                                        s.fillColor === color ? { ...s, fillColor: newColor } : s
-                                                    )
-                                                );
-                                            }}
-                                        />
-                                    ))}
+                                    {Array.from(new Set(Object.values(history.present.shapes).map(shape => shape.fillColor)))
+                                        .map((color, i) => (
+                                            <input
+                                                key={i}
+                                                className="colorSelect"
+                                                type="color"
+                                                value={color}
+                                                onChange={(e) => {
+                                                    const newColor = e.target.value;
+                                                    commit(prev => {
+                                                        const newShapes: Record<string, Shape> = {};
+                                                        for (const id in prev.shapes) {
+                                                            const s = prev.shapes[id];
+                                                            newShapes[id] = s.fillColor === color ? { ...s, fillColor: newColor } : s;
+                                                        }
+                                                        return { ...prev, shapes: newShapes };
+                                                    });
+                                                }}
+                                            />
+                                        ))}
                                 </div>
+
                                 <div className="flex flex-col">
                                     <h2>Stroke</h2>
-                                    {Array.from(
-                                        new Set(history.present.shapes.map(shape => shape.strokeColor))
-                                    ).map((color, i) => (
-                                        <input
-                                            key={i}
-                                            className="colorSelect"
-                                            type="color"
-                                            value={color}
-                                            onChange={(e) => {
-                                                const newColor = e.target.value;
-                                                commit(prevShapes =>
-                                                    prevShapes.map(s =>
-                                                        s.strokeColor === color ? { ...s, strokeColor: newColor } : s
-                                                    )
-                                                );
-                                            }}
-                                        />
-                                    ))}
+                                    {Array.from(new Set(Object.values(history.present.shapes).map(shape => shape.strokeColor)))
+                                        .map((color, i) => (
+                                            <input
+                                                key={i}
+                                                className="colorSelect"
+                                                type="color"
+                                                value={color}
+                                                onChange={(e) => {
+                                                    const newColor = e.target.value;
+                                                    commit(prev => {
+                                                        const newShapes: Record<string, Shape> = {};
+                                                        for (const id in prev.shapes) {
+                                                            const s = prev.shapes[id];
+                                                            newShapes[id] = s.strokeColor === color ? { ...s, strokeColor: newColor } : s;
+                                                        }
+                                                        return { ...prev, shapes: newShapes };
+                                                    });
+                                                }}
+                                            />
+                                        ))}
                                 </div>
+
                                 <div className="flex flex-col">
                                     <h2>Flip</h2>
                                     {Array.from(
-                                        new Set(
-                                            history.present.shapes.map(s => `${s.strokeColor}|${s.fillColor}`)
-                                        )
+                                        new Set(Object.values(history.present.shapes).map(s => `${s.strokeColor}|${s.fillColor}`))
                                     ).map((pair, i) => {
                                         const [stroke, fill] = pair.split("|");
 
@@ -1809,13 +1980,17 @@ export default function Main() {
                                             <button
                                                 key={i}
                                                 onClick={() => {
-                                                    commit(prevShapes =>
-                                                        prevShapes.map(s =>
-                                                            s.strokeColor === stroke && s.fillColor === fill
-                                                                ? { ...s, strokeColor: fill, fillColor: stroke }
-                                                                : s
-                                                        )
-                                                    );
+                                                    commit(prev => {
+                                                        const newShapes: Record<string, Shape> = {};
+                                                        for (const id in prev.shapes) {
+                                                            const s = prev.shapes[id];
+                                                            newShapes[id] =
+                                                                s.strokeColor === stroke && s.fillColor === fill
+                                                                    ? { ...s, strokeColor: fill, fillColor: stroke }
+                                                                    : s;
+                                                        }
+                                                        return { ...prev, shapes: newShapes };
+                                                    });
                                                 }}
                                             >
                                                 {"<->"}
@@ -1929,10 +2104,22 @@ export default function Main() {
                             </div>
                             <h2>Recent files</h2>
                             <div className="flex flex-col gap-2">
-                                {recentFiles.map((file, index) =>
-                                    <div className="flex flex-row gap-2" key={index}>
-                                        <button onClick={() => { commit(() => file.shapes); setFileName(file.fileName) }} >{file.fileName}</button>
-                                        <button onClick={() => { RemoveFromLocalStorage(file.id, setRecentFiles) }} ><i className="fa-solid fa-x"></i></button>
+                                {recentFiles.map((file) =>
+                                    <div className="flex flex-row gap-2" key={file.id}>
+                                        <button onClick={() => {
+                                            commit(() => ({
+                                                shapeOrder: file.shapeOrder ?? [],
+                                                shapes: file.shapes ?? {},
+                                                paths: file.paths ?? {},
+                                                points: file.points ?? {}
+                                            }));
+                                            setFileName(file.fileName);
+                                        }}>
+                                            {file.fileName}
+                                        </button>
+                                        <button onClick={() => { RemoveFromLocalStorage(file.id, setRecentFiles) }}>
+                                            <i className="fa-solid fa-x"></i>
+                                        </button>
                                     </div>
                                 )}
                             </div>

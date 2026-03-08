@@ -1,15 +1,17 @@
-import type { Shape, Vec2 } from "../components/Shape";
+import type { Path, Point, Vec2 } from "../components/Shape";
 
-export default function getHoveredSegment(shape: Shape, threshold: number, mouseX: number, mouseY: number, selectedPathIndex: number) {
-    if (!shape) return -1;
+export default function getHoveredSegment(pathsTable: Record<string, Path>, pointsTable: Record<string, Point>, threshold: number, mouseX: number, mouseY: number, selectedPathId: string) {
 
-    const points = shape.paths[selectedPathIndex].points;
-    const n = points.length;
-    if (n < 2) return -1;
+    const path: Path = pathsTable[selectedPathId];
+    if (!path || path.pointIds.length < 2) return -1;
 
-    for (let i = 0; i < n; i++) { // loop all points
+    const points = path.pointIds.map(pid => pointsTable[pid]).filter(Boolean);
+
+    if (points.length < 2) return -1;
+
+    for (let i = 0; i < points.length; i++) { // loop all points
         const a = points[i];
-        const b = points[(i + 1) % n]; // modulo to loop back to first
+        const b = points[(i + 1) % points.length]; // modulo to loop back to first
 
         const dist = distancePointToCubicBezier(mouseX, mouseY, a, a.out ?? a, b.in ?? b, b);
 

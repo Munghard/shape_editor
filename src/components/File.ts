@@ -1,7 +1,8 @@
 
+import type { HistoryState } from "./History";
 import { MAX_RECENT, RECENTFILESKEY } from "./Main";
 import type { SaveData } from "./SaveData";
-import { DrawShape, type Rect, type Shape } from "./Shape";
+import { DrawShape, type Path, type Point, type Rect, type Shape } from "./Shape";
 
 
 
@@ -9,7 +10,9 @@ import { DrawShape, type Rect, type Shape } from "./Shape";
 export function ExportShape(
     selectedExportScale: string,
     fileName: string,
-    shapes: Shape[],
+    shapes: Record<string, Shape>,
+    paths: Record<string, Path>,
+    points: Record<string, Point>,
     frame: Rect,
 ): void {
     const scale = Number(selectedExportScale);
@@ -36,8 +39,8 @@ export function ExportShape(
 
     // 5. Draw shapes in their original global coordinates
     // We no longer need to manually map/offset every point in the shapes!
-    shapes.forEach(shape => {
-        DrawShape(ctx, shape);
+    Object.values(shapes).forEach(shape => {
+        DrawShape(ctx, shape, paths, points);
     });
 
     ctx.restore();
@@ -49,11 +52,14 @@ export function ExportShape(
     link.download = `${fileName}.png`;
     link.click();
 }
-export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, snapGrid: boolean, gridSubd: number): void {
+export function SaveFile(fileName: string, shapOrder: string[], shapes: Record<string, Shape>, paths: Record<string, Path>, points: Record<string, Point>, useGrid: boolean, snapGrid: boolean, gridSubd: number): void {
     const saveData: SaveData = {
         id: crypto.randomUUID(),
         fileName,
+        shapeOrder: shapOrder,
         shapes,
+        paths,
+        points,
         useGrid,
         snapGrid,
         gridSubd,
@@ -74,7 +80,7 @@ export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, sn
 
 export function LoadFile(
     setFileName: (fileName: string) => void,
-    commit: (updater: (shapes: Shape[]) => Shape[]) => void,
+    commit: (updater: (prev: HistoryState) => HistoryState) => void,
     setShowGrid: (showGrid: boolean) => void,
     setSnapToGrid: (snapToGrid: boolean) => void,
     setGridSubdivisions: (gridsubd: number) => void,
@@ -101,7 +107,12 @@ export function LoadFile(
 
                 // Apply loaded data to state
                 setFileName(loadData.fileName);
-                commit(() => loadData.shapes);
+                commit(_prev => ({
+                    shapeOrder: loadData.shapeOrder,
+                    shapes: loadData.shapes,
+                    paths: loadData.paths,
+                    points: loadData.points
+                }));
                 setShowGrid(loadData.useGrid);
                 setSnapToGrid(loadData.snapGrid);
                 setGridSubdivisions(loadData.gridSubd);

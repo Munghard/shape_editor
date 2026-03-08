@@ -1,7 +1,10 @@
-import type { Shape } from "./Shape";
+import type { Path, Point, Shape } from "./Shape";
 
 export type HistoryState = {
-    shapes: Shape[];
+    shapeOrder: string[];
+    shapes: Record<string, Shape>;
+    paths: Record<string, Path>;
+    points: Record<string, Point>;
 };
 
 export type History = {

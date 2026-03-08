@@ -1,16 +1,16 @@
 import type { Tool } from "./Main";
 
 type KnobProps = {
-    i: number
+    id: string
     x: number
     y: number
     size: number
     selected: boolean
     tool: Tool
-    handleKnobMouseDown: (e: React.MouseEvent<HTMLDivElement, MouseEvent>, i: number) => void
+    handleKnobMouseDown: (e: React.MouseEvent<HTMLDivElement, MouseEvent>, id: string) => void
 }
 
-export function Knob({ i, x, y, size, selected, tool, handleKnobMouseDown }: KnobProps) {
+export function Knob({ id, x, y, size, selected, tool, handleKnobMouseDown }: KnobProps) {
     var knobSize = selected ? size * 2 : size;
     const knobX = x - (knobSize * 0.5);
     const knobY = y - (knobSize * 0.5);
@@ -23,8 +23,8 @@ export function Knob({ i, x, y, size, selected, tool, handleKnobMouseDown }: Kno
             'hover:bg-zinc-100/50'
     return (
         <div
-            key={i}
-            onMouseDown={(e) => handleKnobMouseDown(e, i)}
+            key={id}
+            onMouseDown={(e) => handleKnobMouseDown(e, id)}
             style={{
                 left: knobX,
                 top: knobY,

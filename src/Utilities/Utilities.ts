@@ -1,11 +1,11 @@
 import type { Camera } from "../components/Camera";
-import type { Point, Shape, Vec2 } from "../components/Shape";
+import type { Path, Point, Shape, Vec2 } from "../components/Shape";
 
 
 export function lerp(a: number, b: number, t: number): number {
     return a + (b - a) * t;
 }
-export function lerpVec2(a: Point, b: Point, t: number): Point {
+export function lerpVec2(a: Point, b: Point, t: number): { x: number, y: number } {
     return {
         x: lerp(a.x, b.x, t),
         y: lerp(a.y, b.y, t)
@@ -37,19 +37,40 @@ export function worldToScreen(worldX: number, worldY: number, camera: Camera, ca
         y: (worldY - camera.y) * camera.zoom * scaleY
     };
 }
-export function shapesEqual(a: Shape[], b: Shape[]) {
+export function shapesEqual(
+    a: Shape[],
+    b: Shape[],
+    pathsA: Record<string, Path>,
+    pathsB: Record<string, Path>,
+    pointsA: Record<string, Point>,
+    pointsB: Record<string, Point>
+) {
     if (!a || !b || a.length !== b.length) return false;
+
     for (let i = 0; i < a.length; i++) {
-        if (a[i].paths.length !== b[i].paths.length) return false;
-        for (let j = 0; j < a[i].paths.length; j++) {
-            if (a[i].paths[j].points.length !== b[i].paths[j].points.length) return false;
-            for (let k = 0; k < a[i].paths[j].points.length; k++) {
-                const p1 = a[i].paths[j].points[k];
-                const p2 = b[i].paths[j].points[k];
-                if (p1.x !== p2.x || p1.y !== p2.y) return false;
+        const shapeA = a[i];
+        const shapeB = b[i];
+
+        if (shapeA.pathIds.length !== shapeB.pathIds.length) return false;
+
+        for (let j = 0; j < shapeA.pathIds.length; j++) {
+            const pathA = pathsA[shapeA.pathIds[j]];
+            const pathB = pathsB[shapeB.pathIds[j]];
+            if (!pathA || !pathB) return false;
+
+            if (pathA.pointIds.length !== pathB.pointIds.length) return false;
+
+            for (let k = 0; k < pathA.pointIds.length; k++) {
+                const pointA = pointsA[pathA.pointIds[k]];
+                const pointB = pointsB[pathB.pointIds[k]];
+
+                if (!pointA || !pointB) return false;
+
+                if (pointA.x !== pointB.x || pointA.y !== pointB.y) return false;
             }
         }
     }
+
     return true;
 }
 export function getRandomColor(): string {
@@ -62,12 +83,22 @@ export function hexToRgba(hex: string, alpha: number) {
 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
-export function getShapeCenter(shape: Shape) {
+export function getShapeCenter(
+    shape: Shape,
+    paths: Record<string, Path>,
+    points: Record<string, Point>
+) {
     let minX = Infinity, minY = Infinity;
     let maxX = -Infinity, maxY = -Infinity;
 
-    shape.paths.forEach(path => {
-        path.points.forEach(p => {
+    shape.pathIds.forEach(pathId => {
+        const path = paths[pathId];
+        if (!path) return;
+
+        path.pointIds.forEach(pointId => {
+            const p = points[pointId];
+            if (!p) return;
+
             minX = Math.min(minX, p.x);
             minY = Math.min(minY, p.y);
             maxX = Math.max(maxX, p.x);
@@ -87,19 +118,44 @@ export function getCanvasMousePos(e: MouseEvent | React.MouseEvent, canvas: HTML
         y: ((e.clientY - rect.top) / rect.height) * canvas.height
     };
 }
-export function CloneShape(shape: Shape): Shape {
-    return {
+export function CloneShape(shape: Shape, paths: Record<string, Path>, points: Record<string, Point>) {
+    // clone shape itself
+    const newShape: Shape = {
         ...shape,
-        paths: shape.paths.map(path => ({
-            ...path,
-            points: path.points.map(p => ({
-                x: p.x,
-                y: p.y,
-                in: p.in ? { x: p.in.x, y: p.in.y } : undefined,
-                out: p.out ? { x: p.out.x, y: p.out.y } : undefined
-            }))
-        }))
+        pathIds: [...shape.pathIds] // just copy the IDs
     };
+
+    // deep clone paths and points if needed
+    const newPaths: Record<string, Path> = {};
+    const newPoints: Record<string, Point> = {};
+
+    shape.pathIds.forEach(pathId => {
+        const path = paths[pathId];
+        if (!path) return;
+
+        // clone path
+        const clonedPath: Path = {
+            ...path,
+            pointIds: [...path.pointIds]
+        };
+        newPaths[pathId] = clonedPath;
+
+        // clone points
+        path.pointIds.forEach(pointId => {
+            const pt = points[pointId];
+            if (!pt) return;
+
+            newPoints[pointId] = {
+                id: crypto.randomUUID(),
+                x: pt.x,
+                y: pt.y,
+                in: pt.in ? { x: pt.in.x, y: pt.in.y } : undefined,
+                out: pt.out ? { x: pt.out.x, y: pt.out.y } : undefined
+            };
+        });
+    });
+
+    return { shape: newShape, paths: newPaths, points: newPoints };
 }
 export function cubicBezierPoint(t: number, p0: Vec2, c1: Vec2, c2: Vec2, p3: Vec2): Vec2 {
     const u = 1 - t;

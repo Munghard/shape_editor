@@ -9,14 +9,11 @@ export type Rect = {
     w: number;
     h: number;
 }
-export type Path = {
-    points: Point[];
-    isHole: boolean;
-}
 export type Shape = {
+    id: string;
     name: string;
 
-    paths: Path[];
+    pathIds: string[];
     cyclic: boolean;
 
     strokeWidth: number;
@@ -26,7 +23,13 @@ export type Shape = {
     fillColor: string;
     useFill: boolean;
 }
+export type Path = {
+    id: string;
+    pointIds: string[];
+    isHole: boolean;
+}
 export type Point = {
+    id: string;
     x: number;
     y: number;
     in?: Vec2;
@@ -35,21 +38,26 @@ export type Point = {
 
 export function CreateEmptyPath(): Path {
     return {
-        points: [],
+        id: crypto.randomUUID(),
+        pointIds: [],
         isHole: false,
     }
 }
 // Triangle
 export function CreateTriangle(): Path {
+    const points: Point[] = [{ id: crypto.randomUUID(), x: 0, y: 0 }, { id: crypto.randomUUID(), x: 50, y: 0 }, { id: crypto.randomUUID(), x: 25, y: 50 }];
     return {
-        points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 25, y: 50 }],
+        id: crypto.randomUUID(),
+        pointIds: points.map(pt => pt.id),
         isHole: false
     }
 };
 // Square
 export function CreateSquare(): Path {
+    const points: Point[] = [{ id: crypto.randomUUID(), x: 0, y: 0 }, { id: crypto.randomUUID(), x: 50, y: 0 }, { id: crypto.randomUUID(), x: 50, y: 50 }, { id: crypto.randomUUID(), x: 0, y: 50 }];
     return {
-        points: [{ x: 0, y: 0 }, { x: 50, y: 0 }, { x: 50, y: 50 }, { x: 0, y: 50 }],
+        id: crypto.randomUUID(),
+        pointIds: points.map(pt => pt.id),
         isHole: false
     }
 };
@@ -63,12 +71,14 @@ export function CirclePath(radius = 50, segments = 32): Path {
     for (let i = 0; i < segments; i++) {
         const angle = (i / segments) * 2 * Math.PI;
         points.push({
+            id: crypto.randomUUID(),
             x: Math.cos(angle) * radius,
             y: Math.sin(angle) * radius
         });
     }
     return {
-        points,
+        id: crypto.randomUUID(),
+        pointIds: points.map(pt => pt.id),
         isHole: false
     };
 }
@@ -76,8 +86,9 @@ export function CirclePath(radius = 50, segments = 32): Path {
 export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
 
     return {
+        id: crypto.randomUUID(),
         name: "shape",
-        paths,
+        pathIds: paths.map(p => p.id),
         cyclic: true,
         fillColor: '#' + Math.floor(Math.random() * 0xFFFFFF).toString(16).padStart(6, '0'),
         strokeColor: "#ffffff",
@@ -88,13 +99,15 @@ export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
 
 }
 
-export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {
-    if (shape.paths.length === 0) return;
+export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape, pathsTable: Record<string, Path>, pointsTable: Record<string, Point>) {
+    if (shape.pathIds.length === 0) return;
 
     ctx.beginPath();
 
-    shape.paths.forEach(path => {
-        const points = path.points;
+    shape.pathIds.forEach(pathId => {
+        const path = pathsTable[pathId];
+
+        const points = path.pointIds.map(pid => pointsTable[pid]).filter(Boolean);
         if (points.length === 0) return;
 
         ctx.moveTo(points[0].x, points[0].y);
