@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react"
-import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getRandomColor, getShapeCenter, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
+import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
 import { ClearGrid, DrawGrid } from "./Grid";
 import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect } from "./Shape";
 import getHoveredSegment from "./Segment";
@@ -360,8 +360,19 @@ export default function Main() {
                 const newPoints = [...currentPath.points];
                 const p = { ...newPoints[index] };
 
-                p.in = { x: p.x - 20, y: p.y };
-                p.out = { x: p.x + 20, y: p.y };
+                const count = newPoints.length;
+
+                const prevIndex = (index - 1 + count) % count;
+                const nextIndex = (index + 1) % count;
+
+                const prev = { ...newPoints[prevIndex] };
+                const next = { ...newPoints[nextIndex] };
+
+                const newP = lerpVec2(p, prev, 0.5);
+                const newN = lerpVec2(p, next, 0.5);
+
+                p.in = { x: newP.x, y: newP.y };
+                p.out = { x: newN.x, y: newN.y };
 
                 newPoints[index] = p;
                 currentPath.points = newPoints;
@@ -1400,6 +1411,32 @@ export default function Main() {
         if (canvasRef.current) ClearCanvas(canvasRef.current.getContext("2d")!);
     }
 
+    function resetCamera() {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        var w = canvas.width;
+        var h = canvas.height;
+        cameraRef.current.x = 0 - w / 2;
+        cameraRef.current.y = 0 - h / 2;
+        cameraRef.current.zoom = 1;
+        Draw();
+        ReDrawGrid();
+    }
+
+    function centerCamera() {
+        const canvas = canvasRef.current;
+        if (!canvas || !shape) return;
+
+        const center = getShapeCenter(shape);
+        const zoom = cameraRef.current.zoom;
+
+        cameraRef.current.x = center.x - canvas.width / (2 * zoom);
+        cameraRef.current.y = center.y - canvas.height / (2 * zoom);
+
+        Draw();
+        ReDrawGrid();
+    }
+
     return (
         <>
             <div className="flex flex-row justify-between h-screen ">
@@ -1791,7 +1828,6 @@ export default function Main() {
 
 
                         <Panel title="Knobs">
-
                             {/* Knob size */}
                             <div className="flex flex-row gap-2">
                                 <label>Show knobs</label>
@@ -1810,7 +1846,6 @@ export default function Main() {
                                 <label>Background</label>
                                 <input className="colorSelect" type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
                             </div>
-
                             <p>Grid</p>
                             <div className="flex flex-col ">
                                 {/* this could be a component */}
@@ -1840,6 +1875,22 @@ export default function Main() {
                                 <input type="range" value={gridSubdivions} min={1} max={128} onChange={(e) => setGridSubdivisions(Number(e.target.value))} />
                             </div>
                         </Panel>
+                        <Panel title="Camera">
+                            <div className="flex flex-row gap-2">
+                                <div className="flex flex-row gap-2">
+                                    <label>X: </label><input type="number" className="w-20" value={cameraRef.current.x.toFixed(1)} onChange={(e) => cameraRef.current.x = Number(e.target.value)}></input>
+                                </div>
+                                <div className="flex flex-row gap-2">
+                                    <label>Y: </label><input type="number" className="w-20" value={cameraRef.current.y.toFixed(1)} onChange={(e) => cameraRef.current.y = Number(e.target.value)}></input>
+                                </div>
+                            </div>
+                            <div className="flex flex-row gap-2">
+                                <label>Zoom: </label><p className="w-20" >{cameraRef.current.zoom.toFixed(1)}</p>
+                            </div>
+                            <button onClick={(_e) => { resetCamera() }}>Reset</button>
+                            <button onClick={(_e) => { centerCamera() }}>Center</button>
+                        </Panel>
+
                         <Panel title="File">
                             {/* Export */}
                             <div className="flex flex-row gap-2 ">

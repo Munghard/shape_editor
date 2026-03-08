@@ -21,14 +21,17 @@ DONE
 - [x] colors panel, display all colors in file and allow changing 
 - [x]curves ctx.quadraticCurveTo(cpX, cpY, endX, endY) ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY)
 - [x] collapsible panels, make panel2 into a component with children and headertitle
+- [x] add hotkeys for delete selection, shape, point, path (delete) . duplicate (ctrl + D, alt + move)
+- [x] camera panel,center camera button
 
 TODO
-- [ ] add hotkeys for delete selection, shape, point, path (delete) . duplicate (ctrl + D, alt + move)
+- [ ] transform for shapes, could add children to shapes and group
+- [ ] add quadratic curve button and (only in or out on point)
 - [ ] preview shapes for live updating when moving curve handles
 - [ ] something wrong with grid rendering when you turn it off
 - [ ] export to svg, maybe other formats too
-- [ ] center camera button
-- [ ] Multi shape select
+- [ ] Multi select, add new type PointSelect = {shapeIndex:number,pathIndex:number,pointIndex:number} > instead of selectedPointIndex, when you select a point add a new PointSelect to an array to track what shape and path the point belongs to, this should also allow to show all path points at the same time instead of just selected path
+
 - [ ] opacity to stroke and fill
 
 QOL
