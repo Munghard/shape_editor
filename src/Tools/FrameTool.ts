@@ -13,7 +13,7 @@ export class FrameTool extends Tool {
         this.setFrame = setFrame;
     }
 
-    onMouseDown(_e: MouseEvent, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
+    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
         this.isDragging = true;
     }
     onMouseMove(e: MouseEvent, editor: Editor): void {

@@ -4,20 +4,25 @@ import { Tool } from "./Tool";
 
 export class PanTool extends Tool {
 
-    onMouseDown(_e: MouseEvent, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
+    onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D, _editor: Editor): void {
         this.isDragging = true;
+
+        const cmp = getCanvasMousePos(e, ctx.canvas);
+        this.dragOffsetX = cmp.x;
+        this.dragOffsetY = cmp.y;
+
     }
     onMouseMove(e: MouseEvent, editor: Editor): void {
+        if (!this.isDragging) return;
+
         const cmp = getCanvasMousePos(e, editor.canvas)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
-        // return if no shape selected
-
 
         // delta in screen pixels
-        const dx = screenX - screenX;
-        const dy = screenY - screenY;
+        const dx = screenX - this.dragOffsetX;
+        const dy = screenY - this.dragOffsetY;
 
         // convert to world units by dividing by zoom once
         editor.camera.x -= dx / editor.camera.zoom;
@@ -28,8 +33,6 @@ export class PanTool extends Tool {
 
         editor.Draw()
         editor.redrawGrid();
-        // console.log(cameraRef.current.x, cameraRef.current.y)
-        // ReDrawGrid();
     }
     onMouseUp(_e: MouseEvent, _editor: Editor): void {
         this.isDragging = false;

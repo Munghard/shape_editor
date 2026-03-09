@@ -79,7 +79,7 @@ export default function Main() {
     const [showGrid, setShowGrid] = useState<boolean>(true);
     const [gridSubdivions, setGridSubdivisions] = useState<number>(8);
 
-    const [selectedSegment, setSelectedSegment] = useState<number>(-1);
+    const [selectedSegmentIndex, setSelectedSegmentIndex] = useState<number>(-1);
 
     const [showKnobs, setShowKnobs] = useState<boolean>(true);
     const [knobSize, setKnobSize] = useState<number>(16);
@@ -110,19 +110,19 @@ export default function Main() {
                 handleToolChange(new DeleteTool(handleRemovePoint));
                 break;
             case "Select":
-                handleToolChange(new SelectTool(selectShapeAt, setSelectedPointIndex, startDragging));
+                handleToolChange(new SelectTool(startDragging));
                 break;
             case "Move":
-                handleToolChange(new MoveTool(selectShapeAt, setSelectedPointIndex, startDragging));
+                handleToolChange(new MoveTool(startDragging));
                 break;
             case "Rotate":
-                handleToolChange(new RotateTool(setSelectedPointIndex, startDragging));
+                handleToolChange(new RotateTool(startDragging));
                 break;
             case "Scale":
-                handleToolChange(new ScaleTool(setSelectedPointIndex, startDragging));
+                handleToolChange(new ScaleTool(startDragging));
                 break;
             case "Insert":
-                handleToolChange(new InsertTool(setSelectedPointIndex, startDragging, setSelectedSegment, AddNewShape, AddNewPath, ClearOverlayCanvas, handleCreatePoint));
+                handleToolChange(new InsertTool(startDragging, AddNewShape, AddNewPath, ClearOverlayCanvas, handleCreatePoint));
                 break;
             case "Pan":
                 handleToolChange(new PanTool());
@@ -162,6 +162,13 @@ export default function Main() {
             selectedShapeIndex,
             selectedPathIndex,
             selectedPointIndex,
+            selectedSegmentIndex,
+
+            setSelectedShapeIndex,
+            setSelectedPathIndex,
+            setSelectedPointIndex,
+            setSelectedSegmentIndex,
+
             hiddenShapeIndicies
         );
     }, []);
@@ -622,7 +629,7 @@ export default function Main() {
         const ctx = canvasRef.current.getContext("2d");
         if (!ctx) return;
 
-        editorRef.current.onMouseDown(e as unknown as MouseEvent, ctx)
+        editorRef.current.onMouseDown(e, ctx)
     }
 
 
@@ -641,72 +648,7 @@ export default function Main() {
         }
     }
 
-    function selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
-        let foundShapeIndex = -1;
-        let nextPathIndex = -1;
 
-        // loop from top-most shape down
-        for (let i = history.present.shapes.length - 1; i >= 0; i--) {
-            buildPath(ctx, history.present.shapes[i]);
-
-            if (ctx.isPointInPath(x, y)) {
-                foundShapeIndex = i;
-
-                if (i === selectedShapeIndex) {
-                    // cycle to next path
-                    const pathCount = history.present.shapes[i].paths.length;
-                    nextPathIndex = (selectedPathIndex + 1) % pathCount;
-                } else {
-                    nextPathIndex = 0;
-                }
-
-                break;
-            }
-        }
-
-        // update state **once**, after selection is determined
-        setSelectedShapeIndex(foundShapeIndex);
-        setSelectedPathIndex(nextPathIndex);
-        setSelectedPointIndex(-1);
-    }
-
-    function buildPath(ctx: CanvasRenderingContext2D, shape: Shape) {
-        ctx.beginPath();
-        for (let index = 0; index < shape.paths.length; index++) {
-
-            const points = shape.paths[index].points;
-
-            if (!points || points.length === 0) continue;
-
-            ctx.moveTo(points[0].x, points[0].y);
-
-            for (let i = 1; i < points.length; i++) {
-                const prev = points[i - 1];
-                const curr = points[i];
-                ctx.bezierCurveTo(
-                    prev.out?.x ?? prev.x,
-                    prev.out?.y ?? prev.y,
-                    curr.in?.x ?? curr.x,
-                    curr.in?.y ?? curr.y,
-                    curr.x, curr.y
-                );
-            }
-            if (shape.cyclic && points.length > 1) {
-                const last = points[points.length - 1];
-                const first = points[0];
-
-                ctx.bezierCurveTo(
-                    last.out?.x ?? last.x,
-                    last.out?.y ?? last.y,
-                    first.in?.x ?? first.x,
-                    first.in?.y ?? first.y,
-                    first.x,
-                    first.y
-                );
-                ctx.closePath(); // optional for closed shapes
-            }
-        }
-    }
 
 
     function MovePointByIndex(pointIndex: number, newPoint: Point) {
@@ -779,10 +721,10 @@ export default function Main() {
 
         let newPoint: Point;
 
-        if (selectedSegment !== -1) {
+        if (selectedSegmentIndex !== -1) {
             const n = path.points.length;
-            const start = path.points[selectedSegment];
-            const end = path.points[(selectedSegment + 1) % n];
+            const start = path.points[selectedSegmentIndex];
+            const end = path.points[(selectedSegmentIndex + 1) % n];
 
             const c1 = start.out ?? start; // fallback if null
             const c2 = end.in ?? end;
@@ -790,9 +732,9 @@ export default function Main() {
             // get midpoint along cubic Bezier
             newPoint = cubicBezierPoint(0.5, start, c1, c2, end);
 
-            insertPointAt(selectedSegment, newPoint.x, newPoint.y);
-            setSelectedPointIndex(selectedSegment + 1);
-            startDragging(selectedSegment + 1);
+            insertPointAt(selectedSegmentIndex, newPoint.x, newPoint.y);
+            setSelectedPointIndex(selectedSegmentIndex + 1);
+            startDragging(selectedSegmentIndex + 1);
 
         } else {
             if (snapToGrid) {
@@ -1027,13 +969,13 @@ export default function Main() {
         if (selectedShapeIndex === -1) return;
         commit(prev => [...prev.filter(s => s !== shape)]);
         setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
-        setSelectedSegment(0);
+        setSelectedSegmentIndex(0);
     }
     function DeleteShape(index: number): void {
         if (index === -1) return;
         commit(prev => [...prev.filter((_s, i) => i !== index)]);
         setSelectedShapeIndex(-1);
-        setSelectedSegment(0);
+        setSelectedSegmentIndex(0);
     }
 
     // update shape helper

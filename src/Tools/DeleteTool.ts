@@ -9,7 +9,7 @@ export class DeleteTool extends Tool {
         this.handleRemovePoint = handleRemovePoint;
     }
 
-    onMouseDown(_e: MouseEvent, _ctx: CanvasRenderingContext2D, _editor: Editor): void { }
+    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void { }
     onMouseMove(_e: MouseEvent, _editor: Editor): void { }
     onMouseUp(_e: MouseEvent, _editor: Editor): void { }
     onMouseUpKnob(_e: MouseEvent, _editor: Editor, knobIndex: number): void {

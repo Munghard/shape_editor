@@ -4,15 +4,13 @@ import { getCanvasMousePos, getShapeCenter } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class RotateTool extends Tool {
-    private setSelectedPointIndex: (index: number) => void;
     private startDragging: (index: number) => void;
 
-    constructor(setSelectedPointIndex: (index: number) => void, startDragging: (index: number) => void) {
+    constructor(startDragging: (index: number) => void) {
         super();
-        this.setSelectedPointIndex = setSelectedPointIndex;
         this.startDragging = startDragging;
     }
-    onMouseDown(_e: MouseEvent, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
+    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
         this.isDragging = true;
     }
     onMouseMove(e: MouseEvent, editor: Editor): void {
@@ -59,8 +57,8 @@ export class RotateTool extends Tool {
     onMouseUp(_e: MouseEvent, _editor: Editor): void {
         this.isDragging = false;
     }
-    onMouseKnob(_e: MouseEvent, _editor: Editor, knobIndex: number): void {
-        this.setSelectedPointIndex(knobIndex);
+    onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
+        editor.setSelectedPointIndex(knobIndex);
         this.startDragging(knobIndex);
     }
 }

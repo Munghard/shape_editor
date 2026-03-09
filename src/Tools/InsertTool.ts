@@ -4,9 +4,7 @@ import { cubicBezierPoint, getCanvasMousePos, screenToWorld, worldToScreen } fro
 import { Tool } from "./Tool";
 
 export class InsertTool extends Tool {
-    private setSelectedPointIndex: (index: number) => void;
     private startDragging: (index: number) => void;
-    private setSelectedSegment: (number: number) => void;
     private AddNewShape: (shape: string) => void;
     private AddNewPath: () => void;
     private ClearOverlayCanvas: () => void;
@@ -14,8 +12,6 @@ export class InsertTool extends Tool {
 
 
     constructor(
-        setSelectedSegment: (number: number) => void,
-        setSelectedPointIndex: (index: number) => void,
         startDragging: (index: number) => void,
         AddNewShape: (shape: string) => void,
         AddNewPath: () => void,
@@ -23,8 +19,6 @@ export class InsertTool extends Tool {
         handleCreatePoint: (e: React.MouseEvent<HTMLCanvasElement>, targetIndex: number) => void,
     ) {
         super();
-        this.setSelectedSegment = setSelectedSegment;
-        this.setSelectedPointIndex = setSelectedPointIndex;
         this.startDragging = startDragging;
         this.AddNewShape = AddNewShape;
         this.AddNewPath = AddNewPath;
@@ -32,7 +26,7 @@ export class InsertTool extends Tool {
         this.handleCreatePoint = handleCreatePoint;
     }
 
-    onMouseDown(e: MouseEvent, _ctx: CanvasRenderingContext2D, editor: Editor): void {
+    onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, editor: Editor): void {
         this.isDragging = true;
         let targetIndex = editor.selectedShapeIndex;
         if (e.shiftKey) {
@@ -60,7 +54,7 @@ export class InsertTool extends Tool {
         const worldPos = screenToWorld(screenX, screenY, editor.camera);
         const shape = editor.history.present.shapes[editor.selectedShapeIndex];
         var seg = getHoveredSegment(shape, threshold, worldPos.x, worldPos.y, editor.selectedPathIndex);
-        this.setSelectedSegment(seg);
+        editor.setSelectedSegmentIndex(seg);
         // console.log("segment: " + seg);
 
 
@@ -102,8 +96,8 @@ export class InsertTool extends Tool {
     onMouseUp(_e: MouseEvent, _editor: Editor): void {
         this.isDragging = false;
     }
-    onMouseKnob(_e: MouseEvent, _editor: Editor, knobIndex: number): void {
-        this.setSelectedPointIndex(knobIndex);
+    onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
+        editor.setSelectedPointIndex(knobIndex);
         this.startDragging(knobIndex);
     }
 }
