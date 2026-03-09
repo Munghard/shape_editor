@@ -25,6 +25,7 @@ DONE
 - [x] camera panel,center camera button
 
 TODO
+- [ ] separate tools to its own file
 - [ ] transform for shapes, could add children to shapes and group
 - [ ] add quadratic curve button and (only in or out on point)
 - [ ] preview shapes for live updating when moving curve handles

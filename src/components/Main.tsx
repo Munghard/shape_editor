@@ -1,20 +1,29 @@
 import React, { useEffect, useRef, useState } from "react"
 import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getRandomColor, getShapeCenter, lerpVec2, screenToWorld, shapesEqual, worldToScreen } from "../Utilities/Utilities";
-import { ClearGrid, DrawGrid } from "./Grid";
-import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect } from "./Shape";
-import getHoveredSegment from "./Segment";
+import { ClearGrid, DrawGrid } from "../Editor/Grid";
+import { DrawShape, type Shape, type Point, CreateBaseShape, CreateTriangle, CreateCircle, CreateSquare, type Rect, type Path } from "./Shape";
 import { type SaveData } from "./SaveData";
-import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "./File";
-import type { History } from "./History";
-import { toolTooltip } from "./ToolTooltips";
+import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "../Editor/File";
+import type { History } from "../Editor/History";
+import { toolTooltip } from "../Tools/ToolTooltips";
 import { APP_NAME } from "../Constants";
 import { Knob } from "./Knob";
 import { Handle } from "./Handle";
-import { DrawHandleLines } from "./OverlayCanvas";
+import { DrawHandleLines } from "../Editor/OverlayCanvas";
 import { Panel } from "./Panel";
 import { PanelContainer } from "./PanelContainer";
+import { Editor } from "../Editor/Editor";
+import type { Tool } from "../Tools/Tool";
+import { SelectTool } from "../Tools/SelectTool";
+import { MoveTool } from "../Tools/MoveTool";
+import { RotateTool } from "../Tools/RotateTool";
+import { ScaleTool } from "../Tools/ScaleTool";
+import { InsertTool } from "../Tools/InsertTool";
+import { PanTool } from "../Tools/PanTool";
+import { FrameTool } from "../Tools/FrameTool";
+import { DeleteTool } from "../Tools/DeleteTool";
 
-export type Tool = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
+export type ToolEnum = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
 export const MAX_RECENT = 5;
 export const RECENTFILESKEY = "recentFiles";
@@ -36,7 +45,7 @@ export default function Main() {
     const [frame, setFrame] = useState<Rect>({ x: -500, y: -500, w: 1000, h: 1000 });
 
     // CANVAS
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null); // this is for knobs
 
     //SHAPE
@@ -91,21 +100,78 @@ export default function Main() {
     const draggingRef = useRef<{ index: number, handleIn: boolean } | null>(null);
     const dragDeltaRef = useRef<{ index: number; handleIn: boolean; dx: number; dy: number } | null>(null);
 
-    const [tool, setTool] = useState<Tool>("Select");
+    const [toolEnum, setToolEnum] = useState<ToolEnum>("Select");
+
+    function setTool(tool: ToolEnum) {
+        setToolEnum(tool);
+        if (!editorRef.current) return;
+        switch (tool) {
+            case "Delete":
+                handleToolChange(new DeleteTool(handleRemovePoint));
+                break;
+            case "Select":
+                handleToolChange(new SelectTool(selectShapeAt, setSelectedPointIndex, startDragging));
+                break;
+            case "Move":
+                handleToolChange(new MoveTool(selectShapeAt, setSelectedPointIndex, startDragging));
+                break;
+            case "Rotate":
+                handleToolChange(new RotateTool(setSelectedPointIndex, startDragging));
+                break;
+            case "Scale":
+                handleToolChange(new ScaleTool(setSelectedPointIndex, startDragging));
+                break;
+            case "Insert":
+                handleToolChange(new InsertTool(setSelectedPointIndex, startDragging, setSelectedSegment, AddNewShape, AddNewPath, ClearOverlayCanvas, handleCreatePoint));
+                break;
+            case "Pan":
+                handleToolChange(new PanTool());
+                break;
+            case "Frame":
+                handleToolChange(new FrameTool(setFrame));
+                break;
+
+        }
+
+    }
+    const handleToolChange = (tool: Tool) => {
+        if (!editorRef.current) return;
+        editorRef.current.activeTool = tool;
+        setActiveTool(tool);
+    }
+
+    const [activeTool, setActiveTool] = useState<Tool | null>(null);
+    const editorRef = useRef<Editor | null>(null);
+
+    const tool = editorRef.current ? editorRef.current.activeTool : null;
+
 
     const [selectedExportScale, setSelectedExportScale] = useState<string>("1");
 
 
-    // DRAG
-    const [dragging, setDragging] = useState<boolean>(false);
-    const dragOffset = useRef({ x: 0, y: 0 });
+    // create editor
+    useEffect(() => {
+        if (!canvasRef.current) return; // canvasref is set on the canvas ui component
+
+        editorRef.current = new Editor(
+            canvasRef.current,
+            cameraRef.current,
+            history,
+            activeTool,
+            ReDrawGrid,
+            selectedShapeIndex,
+            selectedPathIndex,
+            selectedPointIndex,
+            hiddenShapeIndicies
+        );
+    }, []);
 
     // Session LOADING
     useEffect(() => {
         const saved = localStorage.getItem("Session");
         if (saved) {
             try {
-                const data = JSON.parse(saved) as { history: History; frame: Rect; tool: Tool };
+                const data = JSON.parse(saved) as { history: History; frame: Rect; tool: ToolEnum };
                 if (data.history) setHistory(data.history);
                 if (data.frame) setFrame(data.frame);
                 if (data.tool) setTool(data.tool);
@@ -410,271 +476,18 @@ export default function Main() {
         });
     }
 
-    // ================================================================================================================
-    // MOVE 
-    // ================================================================================================================
-    function MovePoint(p: Point, dx: number, dy: number) {
-        p.x += dx;
-        p.y += dy;
 
-        if (p.in) {
-            p.in.x += dx;
-            p.in.y += dy;
-        }
 
-        if (p.out) {
-            p.out.x += dx;
-            p.out.y += dy;
-        }
-    }
-    // ================================================================================================================
-    // ROTATE
-    // ================================================================================================================
-    function RotatePoint(p: Point, center: { x: number; y: number; }, cos: number, sin: number) {
-        const offsetX = p.x - center.x;
-        const offsetY = p.y - center.y;
-
-        // apply rotation
-        const rotatedX = offsetX * cos - offsetY * sin;
-        const rotatedY = offsetX * sin + offsetY * cos;
-
-        p.x = center.x + rotatedX;
-        p.y = center.y + rotatedY;
-
-        if (p.in) {
-            const inOffsetX = p.in.x - center.x;
-            const inOffsetY = p.in.y - center.y;
-
-            // apply rotation
-            const rotatedInX = inOffsetX * cos - inOffsetY * sin;
-            const rotatedInY = inOffsetX * sin + inOffsetY * cos;
-
-            p.in.x = center.x + rotatedInX;
-            p.in.y = center.y + rotatedInY;
-        }
-        if (p.out) {
-            const outOffsetX = p.out.x - center.x;
-            const outOffsetY = p.out.y - center.y;
-
-            // apply rotation
-            const rotatedOutX = outOffsetX * cos - outOffsetY * sin;
-            const rotatedOutY = outOffsetX * sin + outOffsetY * cos;
-
-            p.out.x = center.x + rotatedOutX;
-            p.out.y = center.y + rotatedOutY;
-        }
-    }
-    // ================================================================================================================
-    // SCALE
-    // ================================================================================================================
-    function ScalePoint(p: Point, center: { x: number; y: number }, scaleFactor: number) {
-        p.x = center.x + (p.x - center.x) * scaleFactor;
-        p.y = center.y + (p.y - center.y) * scaleFactor;
-        if (p.in) {
-            p.in.x = center.x + (p.in.x - center.x) * scaleFactor;
-            p.in.y = center.y + (p.in.y - center.y) * scaleFactor;
-        }
-        if (p.out) {
-            p.out.x = center.x + (p.out.x - center.x) * scaleFactor;
-            p.out.y = center.y + (p.out.y - center.y) * scaleFactor;
-        }
-    }
 
     function handleMouseMove(e: React.DragEvent<HTMLCanvasElement>) {
 
-        if (!canvasRef.current) return;
+        const mouseEvent = {
+            clientX: e.clientX,
+            clientY: e.clientY
+        } as MouseEvent;
+        if (!editorRef.current) return;
+        editorRef.current.onMouseMove(mouseEvent);
 
-        var cmp = getCanvasMousePos(e, canvasRef.current)
-
-        let screenX = cmp.x;
-        let screenY = cmp.y;
-
-        if (tool === "Move") {
-            // return if no shape selected
-            if (!shape) return;
-            // move all points in paths in shape
-            if (dragging) {
-                const dx = (screenX - dragOffset.current.x) / cameraRef.current.zoom;
-                const dy = (screenY - dragOffset.current.y) / cameraRef.current.zoom;
-
-                const shape = history.present.shapes[selectedShapeIndex];
-                const shapes = history.present.shapes;
-
-                if (e.ctrlKey) {
-                    shapes.forEach(shape => {
-                        shape.paths.forEach(path => {
-                            path.points.forEach(p => {
-                                MovePoint(p, dx, dy);
-                            });
-                        });
-                    });
-                }
-                else {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            MovePoint(p, dx, dy);
-                        });
-                    });
-                }
-
-                dragOffset.current = { x: screenX, y: screenY };
-                Draw();
-                // ReDrawGrid();
-            }
-        }
-        else if (tool === "Rotate" && dragging && lastMouseRef.current) {
-
-            // const dx = screenX - lastMouseRef.current.x;
-            const dy = screenY - lastMouseRef.current.y;
-
-            lastMouseRef.current = { x: screenX, y: screenY };
-
-            const shape = history.present.shapes[selectedShapeIndex];
-            const shapes = history.present.shapes;
-            if (!shape) return;
-
-            const center = getShapeCenter(shape);
-
-            // Rotate based on vertical mouse delta (dy)
-            // You can tweak the factor to control sensitivity
-            const angle = dy * 0.01; // radians
-            const sin = Math.sin(angle);
-            const cos = Math.cos(angle);
-            if (e.ctrlKey) {
-                shapes.forEach(shape => {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            RotatePoint(p, center, cos, sin);
-                        });
-                    });
-                });
-            }
-            else {
-                shape.paths.forEach(path => {
-                    path.points.forEach(p => {
-                        RotatePoint(p, center, cos, sin);
-                    });
-                });
-            }
-            dragOffset.current = { x: screenX, y: screenY };
-            Draw();
-        }
-        if (tool === "Scale" && dragging && lastMouseRef.current) {
-
-            // const dx = screenX - lastMouseRef.current.x;
-            const dy = screenY - lastMouseRef.current.y;
-
-            lastMouseRef.current = { x: screenX, y: screenY };
-
-            const shape = history.present.shapes[selectedShapeIndex];
-            const shapes = history.present.shapes;
-            if (!shape) return;
-
-            const center = getShapeCenter(shape);
-
-            const scaleFactor = Math.max(0.1, 1 + dy * 0.01);
-
-            if (e.ctrlKey) {
-                shapes.forEach(shape => {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            ScalePoint(p, center, scaleFactor);
-                        });
-                    });
-                });
-            }
-            else {
-
-                shape.paths.forEach(path => {
-                    path.points.forEach(p => {
-                        ScalePoint(p, center, scaleFactor);
-                    });
-                });
-            }
-            dragOffset.current = { x: screenX, y: screenY };
-            Draw();
-        }
-        else if (tool === "Frame" && dragging && lastMouseRef.current) {
-            if (!lastMouseRef.current) return
-
-            // delta in screen pixels
-            const dx = (screenX - lastMouseRef.current.x) / cameraRef.current.zoom;
-            const dy = (screenY - lastMouseRef.current.y) / cameraRef.current.zoom;
-
-            // convert to world units by dividing by zoom once
-            if (e.ctrlKey) {
-                setFrame(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-            }
-            else if (e.shiftKey) {
-                setFrame(prev => ({ ...prev, w: prev.h + dy, h: prev.h + dy }));
-            }
-            else {
-                setFrame(prev => ({ ...prev, w: prev.w + dx, h: prev.h + dy }));
-            }
-
-            lastMouseRef.current = { x: screenX, y: screenY }
-
-            // Draw()
-            // ReDrawGrid();
-            // console.log(cameraRef.current.x, cameraRef.current.y)
-        }
-        else if (tool === "Pan" && dragging && lastMouseRef.current) {
-            if (!lastMouseRef.current) return
-
-            // delta in screen pixels
-            const dx = screenX - lastMouseRef.current.x;
-            const dy = screenY - lastMouseRef.current.y;
-
-            // convert to world units by dividing by zoom once
-            cameraRef.current.x -= dx / cameraRef.current.zoom;
-            cameraRef.current.y -= dy / cameraRef.current.zoom;
-
-            lastMouseRef.current = { x: screenX, y: screenY }
-
-            Draw()
-            ReDrawGrid();
-            // console.log(cameraRef.current.x, cameraRef.current.y)
-        }
-        else if (tool === "Insert") {
-
-            const threshold = 10; // pixels
-            const worldPos = screenToWorld(screenX, screenY, cameraRef.current);
-            var seg = getHoveredSegment(shape, threshold, worldPos.x, worldPos.y, selectedPathIndex);
-            setSelectedSegment(seg);
-            // console.log("segment: " + seg);
-
-
-            // get overlay canvas
-            var canvas = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // we are hovering a valid segment
-            if (seg !== -1) {
-                // draw a knob in the middle
-                const path = shape.paths[selectedPathIndex];
-                const n = path.points.length;
-                const start = path.points[seg];
-                const end = path.points[(seg + 1) % n]; // loops back to first point if last
-
-                const c1 = start.out ?? start;
-                const c2 = end.in ?? end;
-
-                var pos = cubicBezierPoint(0.5, start, c1, c2, end);
-
-                const { x, y } = worldToScreen(pos.x, pos.y, cameraRef.current, canvasRef.current);
-                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-                ctx.beginPath();
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-                ctx.lineWidth = 2;
-                ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-                ctx.arc(x, y, threshold, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
-            }
-        }
     }
     // ================================================================================================================
     // POINT HANDLES  
@@ -777,17 +590,20 @@ export default function Main() {
     // =================================================================================================================
 
     function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, i: number) {
+        if (!tool) return;
+        if (!editorRef.current) return;
         const knob = e.currentTarget as HTMLDivElement;
         knob.style.pointerEvents = "none";
         knob.style.display = "none";
 
-        if (tool === "Delete") {
-            handleRemovePoint(i)
-        };
-        if (tool === "Select" || tool === "Move" || tool === "Insert") {
-            startDragging(i);
-            setSelectedPointIndex(i);
-        }
+        const mouseEvent = {
+            clientX: e.clientX,
+            clientY: e.clientY
+        } as MouseEvent;
+
+        tool.onMouseDownKnob(mouseEvent, editorRef.current, i);
+
+
 
         function onMouseUp() {
             knob.style.pointerEvents = "auto"; // re-enable after drag
@@ -801,40 +617,14 @@ export default function Main() {
     }
     function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
         if (!canvasRef.current) return;
+        if (!editorRef.current) return;
 
-        var cmp = getCanvasMousePos(e, canvasRef.current)
+        const ctx = canvasRef.current.getContext("2d");
+        if (!ctx) return;
 
-        const screenX = cmp.x;
-        const screenY = cmp.y;
-
-
-        if (tool === "Pan" || tool === "Scale" || tool === "Rotate" || tool === "Frame") {
-            lastMouseRef.current = { x: screenX, y: screenY }
-        }
-        if (tool === "Select" || tool === "Move" || tool === "Scale" || tool === "Rotate") {
-            var ctx = e.currentTarget.getContext("2d") as CanvasRenderingContext2D;
-            selectShapeAt(ctx, screenX, screenY);
-        }
-        else if (tool === "Insert") {
-            let targetIndex = selectedShapeIndex;
-            if (e.shiftKey) {
-                AddNewShape("empty"); // this should also select it
-                targetIndex = history.present.shapes.length;
-
-            }
-            else if (e.ctrlKey) {
-                AddNewPath();
-            }
-            else {
-                ClearOverlayCanvas();
-                handleCreatePoint(e, targetIndex);
-
-            }
-        }
-
-        dragOffset.current = { x: screenX, y: screenY };
-        setDragging(true);
+        editorRef.current.onMouseDown(e as unknown as MouseEvent, ctx)
     }
+
 
     function ClearOverlayCanvas() {
         var co = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
@@ -843,7 +633,6 @@ export default function Main() {
     }
 
     function handleMouseUp(_e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
-        setDragging(false);
 
 
         if (changeDetected()) {
@@ -1443,15 +1232,14 @@ export default function Main() {
             <div className="flex flex-row justify-between h-screen ">
                 <PanelContainer title="TOOLS" left={true}>
 
-
-                    <button className={`${tool === "Select" ? "selected" : ""} `} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
-                    <button className={`${tool === "Insert" ? "selected" : ""} `} onClick={() => setTool("Insert")} title="Insert(W)"><i className="fa-solid fa-pencil"></i></button>
-                    <button className={`${tool === "Move" ? "selected" : ""} `} onClick={() => setTool("Move")} title="Move(A)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
-                    <button className={`${tool === "Rotate" ? "selected" : ""} `} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
-                    <button className={`${tool === "Scale" ? "selected" : ""} `} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-                    <button className={`${tool === "Delete" ? "selected" : ""} `} onClick={() => setTool("Delete")} title="Delete(D)"><i className="fa-solid fa-eraser"></i></button>
-                    <button className={`${tool === "Pan" ? "selected" : ""} `} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
-                    <button className={`${tool === "Frame" ? "selected" : ""} `} onClick={() => setTool("Frame")} title="Frame(F)"><i className="fa-solid fa-crop-simple"></i></button>
+                    <button className={`${toolEnum === "Select" ? "selected" : ""} `} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
+                    <button className={`${toolEnum === "Insert" ? "selected" : ""} `} onClick={() => setTool("Insert")} title="Insert(W)"><i className="fa-solid fa-pencil"></i></button>
+                    <button className={`${toolEnum === "Move" ? "selected" : ""} `} onClick={() => setTool("Move")} title="Move(A)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                    <button className={`${toolEnum === "Rotate" ? "selected" : ""} `} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
+                    <button className={`${toolEnum === "Scale" ? "selected" : ""} `} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+                    <button className={`${toolEnum === "Delete" ? "selected" : ""} `} onClick={() => setTool("Delete")} title="Delete(D)"><i className="fa-solid fa-eraser"></i></button>
+                    <button className={`${toolEnum === "Pan" ? "selected" : ""} `} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
+                    <button className={`${toolEnum === "Frame" ? "selected" : ""} `} onClick={() => setTool("Frame")} title="Frame(F)"><i className="fa-solid fa-crop-simple"></i></button>
 
                 </PanelContainer>
                 {/* shaped and paths */}
@@ -1469,7 +1257,7 @@ export default function Main() {
                                             <button title="Hide" className={`${!hiddenShapeIndicies.includes(i) ? "selected" : ""}`} onClick={() => HideShape(i, !hiddenShapeIndicies.includes(i))}><i className="fa fa-eye"></i></button>
 
                                         </div>
-                                        {i === selectedShapeIndex && s.paths.map((s, i) => {
+                                        {i === selectedShapeIndex && s.paths.map((s: Path, i: number) => {
                                             return (
                                                 <div key={i} className="pl-5 flex flex-row gap-2 justify-between">
                                                     <button className={`${i === selectedPathIndex ? "selected" : ""}`} onClick={() => setSelectedPathIndex(i)}>Path_{i} points: {s.points.length}</button>
@@ -1502,8 +1290,8 @@ export default function Main() {
                         {/* Knobs */}
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
 
-                            {showKnobs && !dragging &&
-                                shape && shape.paths[selectedPathIndex]?.points.map((p, i) => {
+                            {showKnobs &&
+                                shape && shape.paths[selectedPathIndex]?.points.map((p: Point, i: number) => {
                                     if (canvasRect == null) return;
 
                                     const selected = selectedPointIndex === i;
@@ -1514,7 +1302,7 @@ export default function Main() {
                                     const outScreen = p.out && worldToScreen(p.out.x, p.out.y, cameraRef.current, canvasRef.current);
                                     return (
                                         <div key={i}>
-                                            <Knob x={pointScreen.x} y={pointScreen.y} i={i} selected={selected} size={knobSize} tool={tool} handleKnobMouseDown={handleKnobMouseDown}></Knob>
+                                            <Knob x={pointScreen.x} y={pointScreen.y} i={i} selected={selected} size={knobSize} tool={toolEnum} handleKnobMouseDown={handleKnobMouseDown}></Knob>
 
                                             {
                                                 inScreen && selected &&
@@ -1530,7 +1318,7 @@ export default function Main() {
                             }
 
                             {/* Export frame */}
-                            {tool === "Frame" && canvasRef.current && canvasRef.current &&
+                            {toolEnum === "Frame" && canvasRef.current && canvasRef.current && frame &&
                                 (() => {
                                     const pos = worldToScreen(frame.x, frame.y, cameraRef.current, canvasRef.current);
                                     return (

@@ -1,6 +1,6 @@
-import type { Tool } from "./Main";
+import type { ToolEnum } from "./Main";
 
-export function toolTooltip(tool: Tool): string {
+export function toolTooltip(tool: ToolEnum): string {
     switch (tool) {
         case "Select":
             return "Click to select point or shape, click again to select next path in shape";

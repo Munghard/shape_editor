@@ -79,7 +79,8 @@ export function CirclePath(radius = 50, segments = 32): Path {
 }
 
 export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
-    return {
+    const shape =
+    {
         name: "shape",
         paths: paths.map(clonePath),
         cyclic: true,
@@ -89,6 +90,7 @@ export function CreateBaseShape(paths: Path[] = [CreateEmptyPath()]): Shape {
         useFill: true,
         useStroke: true
     }
+    return shape;
 }
 
 export function DrawShape(ctx: CanvasRenderingContext2D, shape: Shape) {

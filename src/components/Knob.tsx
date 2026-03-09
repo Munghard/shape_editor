@@ -1,4 +1,4 @@
-import type { Tool } from "./Main";
+import type { ToolEnum } from "./Main";
 
 type KnobProps = {
     i: number
@@ -6,7 +6,7 @@ type KnobProps = {
     y: number
     size: number
     selected: boolean
-    tool: Tool
+    tool: ToolEnum
     handleKnobMouseDown: (e: React.MouseEvent<HTMLDivElement, MouseEvent>, i: number) => void
 }
 

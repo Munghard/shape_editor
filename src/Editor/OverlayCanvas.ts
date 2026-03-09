@@ -1,5 +1,5 @@
 import { worldToScreen } from "../Utilities/Utilities";
-import type { Camera } from "./Camera";
+import type { Camera } from "../Editor/Camera";
 import type { Point } from "./Shape";
 
 export function DrawHandleLines(ctx: CanvasRenderingContext2D, point: Point, camera: Camera, canvas: HTMLCanvasElement) {

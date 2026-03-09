@@ -1,6 +1,6 @@
 import { APP_NAME } from "../Constants";
 import { hexToRgba } from "../Utilities/Utilities";
-import type { Camera } from "./Camera";
+import type { Camera } from "../Editor/Camera";
 
 export function ClearGrid(ctx: CanvasRenderingContext2D) {
     const canvasWidth = ctx.canvas.width;
