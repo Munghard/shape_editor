@@ -4,59 +4,44 @@ import { cubicBezierPoint, getCanvasMousePos, screenToWorld, worldToScreen } fro
 import { Tool } from "./Tool";
 
 export class InsertTool extends Tool {
-    private startDragging: (index: number) => void;
-    private AddNewShape: (shape: string) => void;
-    private AddNewPath: () => void;
     private ClearOverlayCanvas: () => void;
-    private handleCreatePoint: (e: React.MouseEvent<HTMLCanvasElement>, targetIndex: number) => void;
 
 
     constructor(
-        startDragging: (index: number) => void,
-        AddNewShape: (shape: string) => void,
-        AddNewPath: () => void,
         ClearOverlayCanvas: () => void,
-        handleCreatePoint: (e: React.MouseEvent<HTMLCanvasElement>, targetIndex: number) => void,
     ) {
         super();
-        this.startDragging = startDragging;
-        this.AddNewShape = AddNewShape;
-        this.AddNewPath = AddNewPath;
         this.ClearOverlayCanvas = ClearOverlayCanvas;
-        this.handleCreatePoint = handleCreatePoint;
     }
 
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, editor: Editor): void {
         this.isDragging = true;
         let targetIndex = editor.selectedShapeIndex;
         if (e.shiftKey) {
-            this.AddNewShape("empty"); // this should also select it
-            targetIndex = editor.history.present.shapes.length;
-
+            editor.AddNewShape("empty"); // this should also select it
+            targetIndex = editor.historyRef.current.present.shapes.length;
         }
         else if (e.ctrlKey) {
-            this.AddNewPath();
+            editor.AddNewPath();
         }
         else {
             this.ClearOverlayCanvas();
-            this.handleCreatePoint(e as unknown as React.MouseEvent<HTMLCanvasElement>, targetIndex);
+            editor.handleCreatePoint(e as unknown as React.MouseEvent<HTMLCanvasElement>, targetIndex);
 
         }
     }
-    onMouseMove(e: MouseEvent, editor: Editor): void {
-        const cmp = getCanvasMousePos(e, editor.canvas)
+    onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
+        const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
 
         const threshold = 10; // pixels
 
-        const worldPos = screenToWorld(screenX, screenY, editor.camera);
-        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
+        const worldPos = screenToWorld(screenX, screenY, editor.cameraRef.current);
+        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
         var seg = getHoveredSegment(shape, threshold, worldPos.x, worldPos.y, editor.selectedPathIndex);
         editor.setSelectedSegmentIndex(seg);
-        // console.log("segment: " + seg);
-
 
         // get overlay canvas
         var canvas = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
@@ -78,7 +63,7 @@ export class InsertTool extends Tool {
 
             var pos = cubicBezierPoint(0.5, start, c1, c2, end);
 
-            const { x, y } = worldToScreen(pos.x, pos.y, editor.camera, editor.canvas);
+            const { x, y } = worldToScreen(pos.x, pos.y, editor.cameraRef.current, editor.canvasRef.current);
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             ctx.beginPath();
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
@@ -98,6 +83,6 @@ export class InsertTool extends Tool {
     }
     onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
         editor.setSelectedPointIndex(knobIndex);
-        this.startDragging(knobIndex);
+        editor.startDraggingPoint(knobIndex);
     }
 }

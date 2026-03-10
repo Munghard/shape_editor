@@ -1,4 +1,4 @@
-import type { Shape, Vec2 } from "../components/Shape";
+import type { Shape, Vec2 } from "../Editor/Shape";
 
 export default function getHoveredSegment(shape: Shape, threshold: number, mouseX: number, mouseY: number, selectedPathIndex: number) {
     if (!shape) return -1;

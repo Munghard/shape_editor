@@ -1,20 +1,16 @@
-import type { Path, Shape } from "../components/Shape";
+import type { Path, Shape } from "../Editor/Shape";
 import type { Editor } from "../Editor/Editor";
 import { getCanvasMousePos, getShapeCenter } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class ScaleTool extends Tool {
-    private startDragging: (index: number) => void;
 
-    constructor(startDragging: (index: number) => void) {
-        super();
-        this.startDragging = startDragging;
-    }
     onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
         this.isDragging = true;
     }
-    onMouseMove(e: MouseEvent, editor: Editor): void {
-        const cmp = getCanvasMousePos(e, editor.canvas)
+    onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
+        if (!this.isDragging) return;
+        const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
@@ -24,8 +20,8 @@ export class ScaleTool extends Tool {
         this.dragOffsetX = screenX;
         this.dragOffsetY = screenY;
 
-        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
-        const shapes = editor.history.present.shapes;
+        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
+        const shapes = editor.historyRef.current.present.shapes;
         if (!shape) return;
 
         const center = getShapeCenter(shape);
@@ -59,6 +55,6 @@ export class ScaleTool extends Tool {
     }
     onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
         editor.setSelectedPointIndex(knobIndex);
-        this.startDragging(knobIndex);
+        editor.startDraggingPoint(knobIndex);
     }
 }

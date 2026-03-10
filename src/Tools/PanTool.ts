@@ -12,10 +12,10 @@ export class PanTool extends Tool {
         this.dragOffsetY = cmp.y;
 
     }
-    onMouseMove(e: MouseEvent, editor: Editor): void {
+    onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
 
-        const cmp = getCanvasMousePos(e, editor.canvas)
+        const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
@@ -25,14 +25,14 @@ export class PanTool extends Tool {
         const dy = screenY - this.dragOffsetY;
 
         // convert to world units by dividing by zoom once
-        editor.camera.x -= dx / editor.camera.zoom;
-        editor.camera.y -= dy / editor.camera.zoom;
+        editor.cameraRef.current.x -= dx / editor.cameraRef.current.zoom;
+        editor.cameraRef.current.y -= dy / editor.cameraRef.current.zoom;
 
         this.dragOffsetX = screenX;
         this.dragOffsetY = screenY;
 
         editor.Draw()
-        editor.redrawGrid();
+        editor.ReDrawGrid();
     }
     onMouseUp(_e: MouseEvent, _editor: Editor): void {
         this.isDragging = false;

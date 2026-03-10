@@ -1,4 +1,4 @@
-import type { Rect } from "../components/Shape";
+import type { Rect } from "../Editor/Shape";
 import type { Editor } from "../Editor/Editor";
 import { getCanvasMousePos } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
@@ -16,18 +16,16 @@ export class FrameTool extends Tool {
     onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
         this.isDragging = true;
     }
-    onMouseMove(e: MouseEvent, editor: Editor): void {
+    onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
-        const cmp = getCanvasMousePos(e, editor.canvas)
+        const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
-        // return if no shape selected
-
 
         // delta in screen pixels
-        const dx = (screenX - this.dragOffsetX) / editor.camera.zoom;
-        const dy = (screenY - this.dragOffsetY) / editor.camera.zoom;
+        const dx = (screenX - this.dragOffsetX) / editor.cameraRef.current.zoom;
+        const dy = (screenY - this.dragOffsetY) / editor.cameraRef.current.zoom;
 
         this.setFrame(prev => {
             if (e.ctrlKey) {

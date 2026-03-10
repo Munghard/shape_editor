@@ -1,4 +1,4 @@
-import type { Shape } from "./Shape"
+import type { Shape } from "../Editor/Shape"
 
 export type SaveData = {
     id: string;

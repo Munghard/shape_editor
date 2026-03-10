@@ -1,5 +1,5 @@
 import type { Camera } from "../Editor/Camera";
-import type { Path, Point, Shape, Vec2 } from "../components/Shape";
+import type { Path, Point, Shape, Vec2 } from "../Editor/Shape";
 
 
 export function lerp(a: number, b: number, t: number): number {

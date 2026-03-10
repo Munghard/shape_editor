@@ -1,37 +1,30 @@
-import type { Path, Shape } from "../components/Shape";
+import type { Path, Shape } from "../Editor/Shape";
 import type { Editor } from "../Editor/Editor";
 import { getCanvasMousePos } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class MoveTool extends Tool {
-    private startDragging: (index: number) => void;
 
-    constructor(startDragging: (index: number) => void) {
-        super();
-        this.startDragging = startDragging;
-    }
-    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D, editor: Editor): void {
-
-        const cmp = getCanvasMousePos(_e, ctx.canvas);
-        editor.selectShapeAt(ctx, cmp.x, cmp.y);
-
+    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
         this.isDragging = true;
     }
-    onMouseMove(e: MouseEvent, editor: Editor): void {
-        const cmp = getCanvasMousePos(e, editor.canvas)
+    onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
+        if (!this.isDragging) return;
+        console.log("moving");
+        const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
         // return if no shape selected
-        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
+        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
         if (!shape) return;
         // move all points in paths in shape
         if (this.isDragging) {
-            const dx = (screenX - this.dragOffsetX) / editor.camera.zoom;
-            const dy = (screenY - this.dragOffsetY) / editor.camera.zoom;
+            const dx = (screenX - this.dragOffsetX) / editor.cameraRef.current.zoom;
+            const dy = (screenY - this.dragOffsetY) / editor.cameraRef.current.zoom;
 
-            const shape = editor.history.present.shapes[editor.selectedShapeIndex];
-            const shapes = editor.history.present.shapes;
+            const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
+            const shapes = editor.historyRef.current.present.shapes;
 
             if (e.ctrlKey) {
                 shapes.forEach((shape: Shape) => {
@@ -61,6 +54,6 @@ export class MoveTool extends Tool {
     }
     onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
         editor.setSelectedPointIndex(knobIndex);
-        this.startDragging(knobIndex);
+        editor.startDraggingPoint(knobIndex);
     }
 }
