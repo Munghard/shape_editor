@@ -5,20 +5,26 @@ import { Tool } from "./Tool";
 
 export class ScaleTool extends Tool {
 
-    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
+    onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D, editor: Editor): void {
         this.isDragging = true;
+        const cmp = getCanvasMousePos(e, ctx.canvas);
+        editor.lastMouseRef.current = {
+            x: cmp.x,
+            y: cmp.y,
+        };
     }
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
+        if (!editor.lastMouseRef.current) return;
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
         // const dx = screenX - lastMouseRef.current.x;
-        const dy = screenY - this.dragOffsetY;
+        const dy = screenY - editor.lastMouseRef.current.y;
 
-        this.dragOffsetX = screenX;
-        this.dragOffsetY = screenY;
+        editor.lastMouseRef.current.x = screenX;
+        editor.lastMouseRef.current.y = screenY;
 
         const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
         const shapes = editor.historyRef.current.present.shapes;
@@ -45,16 +51,18 @@ export class ScaleTool extends Tool {
                 });
             });
         }
-        this.dragOffsetX = screenX;
-        this.dragOffsetY = screenY;
+        editor.lastMouseRef.current.x = screenX;
+        editor.lastMouseRef.current.y = screenY;
         editor.Draw();
     }
 
-    onMouseUp(_e: MouseEvent, _editor: Editor): void {
+    onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         this.isDragging = false;
+        editor.lastMouseRef.current = null;
+
     }
-    onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
-        editor.setSelectedPointIndex(knobIndex);
-        editor.startDraggingPoint(knobIndex);
+    onMouseDownKnob(_e: React.MouseEvent<HTMLDivElement>, editor: Editor, index: number): void {
+        editor.setSelectedPointIndex(index);
+        editor.startDraggingPoint(index);
     }
 }

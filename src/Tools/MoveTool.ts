@@ -5,11 +5,17 @@ import { Tool } from "./Tool";
 
 export class MoveTool extends Tool {
 
-    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
+    onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D, editor: Editor): void {
         this.isDragging = true;
+        const cmp = getCanvasMousePos(e, ctx.canvas);
+        editor.lastMouseRef.current = {
+            x: cmp.x,
+            y: cmp.y,
+        };
     }
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
+        if (!editor.lastMouseRef.current) return;
         console.log("moving");
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
@@ -19,41 +25,42 @@ export class MoveTool extends Tool {
         const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
         if (!shape) return;
         // move all points in paths in shape
-        if (this.isDragging) {
-            const dx = (screenX - this.dragOffsetX) / editor.cameraRef.current.zoom;
-            const dy = (screenY - this.dragOffsetY) / editor.cameraRef.current.zoom;
 
-            const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
-            const shapes = editor.historyRef.current.present.shapes;
+        const dx = (screenX - editor.lastMouseRef.current.x) / editor.cameraRef.current.zoom;
+        const dy = (screenY - editor.lastMouseRef.current.y) / editor.cameraRef.current.zoom;
 
-            if (e.ctrlKey) {
-                shapes.forEach((shape: Shape) => {
-                    shape.paths.forEach(path => {
-                        path.points.forEach(p => {
-                            editor.MovePoint(p, dx, dy);
-                        });
-                    });
-                });
-            }
-            else {
-                shape.paths.forEach((path: Path) => {
+        const shapes = editor.historyRef.current.present.shapes;
+
+        if (e.ctrlKey) {
+            shapes.forEach((shape: Shape) => {
+                shape.paths.forEach(path => {
                     path.points.forEach(p => {
                         editor.MovePoint(p, dx, dy);
                     });
                 });
-            }
-
-            this.dragOffsetX = screenX;
-            this.dragOffsetY = screenY;
-            editor.Draw();
-            // ReDrawGrid();
+            });
         }
+        else {
+            shape.paths.forEach((path: Path) => {
+                path.points.forEach(p => {
+                    editor.MovePoint(p, dx, dy);
+                });
+            });
+        }
+
+        editor.lastMouseRef.current.x = screenX;
+        editor.lastMouseRef.current.y = screenY;
+        editor.Draw();
+        // ReDrawGrid();
     }
-    onMouseUp(_e: MouseEvent, _editor: Editor): void {
+    onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>, _editor: Editor): void {
         this.isDragging = false;
+        _editor.lastMouseRef.current = null;
     }
-    onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
-        editor.setSelectedPointIndex(knobIndex);
-        editor.startDraggingPoint(knobIndex);
+
+
+    onMouseDownKnob(_e: React.MouseEvent<HTMLDivElement>, editor: Editor, index: number): void {
+        editor.setSelectedPointIndex(index);
+        editor.startDraggingPoint(index);
     }
 }

@@ -13,19 +13,26 @@ export class FrameTool extends Tool {
         this.setFrame = setFrame;
     }
 
-    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
+    onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D, editor: Editor): void {
         this.isDragging = true;
+        const cmp = getCanvasMousePos(e, ctx.canvas);
+        editor.lastMouseRef.current = {
+            x: cmp.x,
+            y: cmp.y,
+        };
     }
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
+        if (!editor.lastMouseRef.current) return;
+        if (!editor.canvasRef.current) return;
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
         let screenY = cmp.y;
 
         // delta in screen pixels
-        const dx = (screenX - this.dragOffsetX) / editor.cameraRef.current.zoom;
-        const dy = (screenY - this.dragOffsetY) / editor.cameraRef.current.zoom;
+        const dx = (screenX - editor.lastMouseRef.current.x) / editor.cameraRef.current.zoom;
+        const dy = (screenY - editor.lastMouseRef.current.y) / editor.cameraRef.current.zoom;
 
         this.setFrame(prev => {
             if (e.ctrlKey) {
@@ -41,10 +48,11 @@ export class FrameTool extends Tool {
             }
         });
 
-        this.dragOffsetX = screenX;
-        this.dragOffsetY = screenY;
+        editor.lastMouseRef.current.x = screenX;
+        editor.lastMouseRef.current.y = screenY;
     }
-    onMouseUp(_e: MouseEvent, _editor: Editor): void {
+    onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         this.isDragging = false;
+        editor.lastMouseRef.current = null;
     }
 }

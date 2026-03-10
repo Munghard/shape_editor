@@ -16,28 +16,20 @@ export class Editor {
     dragDeltaRef: React.RefObject<{ index: number, handleIn: boolean, dx: number, dy: number } | null>;
     activeTool: ITool | null;
 
-    selectedShapeIndex: number;
-    selectedPathIndex: number;
-    selectedPointIndex: number;
-    selectedSegmentIndex: number;
+    public selectedShapeIndex: number = -1;
+    public selectedPathIndex: number = -1;
+    public selectedPointIndex: number = -1;
+    public selectedSegmentIndex: number = -1;
+    public hiddenShapeIndicies: number[] = [];
 
-    snapToGrid: boolean;
-    gridColor: string;
-    gridAlpha: number;
-    gridSubdivisions: number;
-    setSnapToGrid: React.Dispatch<React.SetStateAction<boolean>>;
-    setGridColor: React.Dispatch<React.SetStateAction<string>>;
-    setGridAlpha: React.Dispatch<React.SetStateAction<number>>;
-    setGridSubdivisions: React.Dispatch<React.SetStateAction<number>>;
+    public snapToGrid: boolean = false;
+    public gridColor: string = "#ffffff";
+    public gridAlpha: number = 0.1;
+    public gridSubdivisions: number = 8;
 
     public setHistory: React.Dispatch<React.SetStateAction<History>>;
-    public setSelectedShapeIndex: React.Dispatch<React.SetStateAction<number>>;
-    public setSelectedPathIndex: React.Dispatch<React.SetStateAction<number>>;
-    public setSelectedPointIndex: React.Dispatch<React.SetStateAction<number>>;
-    public setSelectedSegmentIndex: React.Dispatch<React.SetStateAction<number>>;
-    public setHiddenShapeIndicies: React.Dispatch<React.SetStateAction<number[]>>;
+
     public setTick: React.Dispatch<React.SetStateAction<number>>;
-    hiddenShapeIndicies: number[];
 
 
 
@@ -51,30 +43,9 @@ export class Editor {
 
         activeTool: ITool | null,
 
-        ssi: number,
-        spai: number,
-        spoi: number,
-        ssoi: number,
-
-        snapToGrid: boolean,
-        gridColor: string,
-        gridAlpha: number,
-        gridSubdivisions: number,
-        setSnapToGrid: React.Dispatch<React.SetStateAction<boolean>>,
-        setGridColor: React.Dispatch<React.SetStateAction<string>>,
-        setGridAlpha: React.Dispatch<React.SetStateAction<number>>,
-        setGridSubdivisions: React.Dispatch<React.SetStateAction<number>>,
-
-
         setHistory: React.Dispatch<React.SetStateAction<History>>,
-        setSelectedShapeIndex: React.Dispatch<React.SetStateAction<number>>,
-        setSelectedPathIndex: React.Dispatch<React.SetStateAction<number>>,
-        setSelectedPointIndex: React.Dispatch<React.SetStateAction<number>>,
-        setSelectedSegmentIndex: React.Dispatch<React.SetStateAction<number>>,
-        setHiddenShapeIndicies: React.Dispatch<React.SetStateAction<number[]>>,
-        setTick: React.Dispatch<React.SetStateAction<number>>,
 
-        hiddenShapeIndicies: number[],
+        setTick: React.Dispatch<React.SetStateAction<number>>,
 
     ) {
         this.canvasRef = canvasRef;
@@ -86,58 +57,84 @@ export class Editor {
 
         this.activeTool = activeTool;
 
-        this.selectedShapeIndex = ssi;
-        this.selectedPathIndex = spai;
-        this.selectedPointIndex = spoi;
-        this.selectedSegmentIndex = ssoi;
-
-        this.snapToGrid = snapToGrid;
-        this.gridColor = gridColor;
-        this.gridAlpha = gridAlpha;
-        this.gridSubdivisions = gridSubdivisions;
-
-        this.setGridColor = setGridColor;
-        this.setSnapToGrid = setSnapToGrid;
-        this.setGridAlpha = setGridAlpha;
-        this.setGridSubdivisions = setGridSubdivisions;
-        this.gridColor = gridColor;
-        this.gridAlpha = gridAlpha;
-        this.gridSubdivisions = gridSubdivisions;
-
-
         this.setHistory = setHistory;
-        this.setSelectedShapeIndex = setSelectedShapeIndex;
-        this.setSelectedPathIndex = setSelectedPathIndex;
-        this.setSelectedPointIndex = setSelectedPointIndex;
-        this.setSelectedSegmentIndex = setSelectedSegmentIndex;
-        this.setHiddenShapeIndicies = setHiddenShapeIndicies;
+
         this.setTick = setTick;
-
-        this.hiddenShapeIndicies = hiddenShapeIndicies;
-
-
-
     }
+    // auto updating selectedpoint logic
+    // const selectedPoint =
+    //     selectedShapeIndex !== -1 &&
+    //         selectedPathIndex !== -1 &&
+    //         selectedPointIndex !== -1
+    //         ? history.present.shapes[selectedShapeIndex]
+    //             ?.paths[selectedPathIndex]
+    //             ?.points[selectedPointIndex]
+    //         : null;
 
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D) {
         this.activeTool?.onMouseDown(e, ctx, this)
-        if (this.selectedShapeIndex === -1) {
-            const cmp = getCanvasMousePos(e, ctx.canvas);
-            this.selectShapeAt(ctx, cmp.x, cmp.y);
-        }
+        const cmp = getCanvasMousePos(e, ctx.canvas);
+        this.selectShapeAt(ctx, cmp.x, cmp.y);
     }
-
 
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>) {
         this.activeTool?.onMouseMove(e, this)
     }
 
-    onMouseUp(e: MouseEvent) {
+    onMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
         this.activeTool?.onMouseUp(e, this)
     }
+    onMouseDownKnob(e: React.MouseEvent<HTMLDivElement>) {
+        this.activeTool?.onMouseDownKnob(e, this, this.selectedPointIndex)
+    }
+
+    getSelectedPoint(): Point {
+        return this.historyRef.current.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
+    }
+    getSelectedShape(): Shape {
+        return this.historyRef.current.present.shapes[this.selectedShapeIndex];
+    }
+    setSelectedShapeIndex(index: number) {
+        this.selectedShapeIndex = index;
+        this.setTick(t => t + 1);
+    }
+    setSelectedPathIndex(index: number) {
+        this.selectedPathIndex = index;
+        this.setTick(t => t + 1);
+    }
+    setSelectedPointIndex(index: number) {
+        this.selectedPointIndex = index;
+        this.setTick(t => t + 1);
+    }
+    setSelectedSegmentIndex(index: number) {
+        this.selectedSegmentIndex = index;
+        this.setTick(t => t + 1);
+    }
+    setHiddenShapeIndicies(index: number[]) {
+        this.hiddenShapeIndicies = index;
+        this.setTick(t => t + 1);
+    }
+
     handleClickAddShape(shape: string): void {
         this.AddNewShape(shape);
     }
+    setGridColor(color: string) {
+        this.gridColor = color;
+        this.ReDrawGrid();
+    }
+    setGridAlpha(alpha: number) {
+        this.gridAlpha = alpha;
+        this.ReDrawGrid();
+    }
+
+    setSnapToGrid(snapToGrid: boolean) {
+        this.snapToGrid = snapToGrid;
+    }
+    setGridSubdivisions(gridSubdivisions: number) {
+        this.gridSubdivisions = gridSubdivisions;
+    }
+
+
 
     AddNewShape(shapeName: string, shape: Shape | null = null): Shape {
 
@@ -180,7 +177,7 @@ export class Editor {
         if (this.selectedShapeIndex === -1) return;
         const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
         this.commit(prev => [...prev.filter(s => s !== shape)]);
-        this.setSelectedShapeIndex(prev => Math.max(prev - 1, 0));
+        this.setSelectedShapeIndex(Math.max(this.selectedShapeIndex - 1, 0));
         this.setSelectedSegmentIndex(0);
     }
     DeleteShape(index: number): void {
@@ -230,7 +227,7 @@ export class Editor {
                 return { ...s, paths: newPaths }
             })
         );
-        this.setSelectedPathIndex(prev => Math.max(prev - 1, 0));
+        this.setSelectedPathIndex(Math.max(this.selectedPathIndex - 1, 0));
     }
     DeletePath(shapeIndex: number, pathIndex: number): void {
         this.commit(prev =>
@@ -243,16 +240,16 @@ export class Editor {
                 return { ...s, paths: newPaths }
             })
         );
-        this.setSelectedPathIndex(prev => Math.max(prev - 1, 0));
+        this.setSelectedPathIndex(Math.max(this.selectedPathIndex - 1, 0));
     }
     HideShape(i: number, hide: boolean): void {
         if (hide) {
 
-            this.setHiddenShapeIndicies(prev => [...prev, i]);
+            this.setHiddenShapeIndicies([...this.hiddenShapeIndicies, i]);
         }
         else {
 
-            this.setHiddenShapeIndicies(prev => prev.filter(p => p !== i));
+            this.setHiddenShapeIndicies(this.hiddenShapeIndicies.filter(p => p !== i));
         }
     }
 
@@ -269,8 +266,6 @@ export class Editor {
 
     startDraggingPoint(index: number) {
         if (!this.canvasRef.current) return;
-
-
         if (this.selectedShapeIndex === -1 || this.selectedPathIndex === -1) return;
 
         const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
@@ -326,6 +321,7 @@ export class Editor {
         }
 
         const onMouseUp = () => {
+            this.commit(prev => [...prev]); // push history snapshot
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
         }
@@ -396,12 +392,13 @@ export class Editor {
 
     handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>, targetIndex: number) {
         if (!this.canvasRef.current) return;
+        if (this.selectedPathIndex === -1) return;
         let shapeIndex = targetIndex;
         let pathIndex = this.selectedPathIndex;
-        let _shape = this.historyRef.current.present.shapes[shapeIndex];
+        let shape = this.historyRef.current.present.shapes[shapeIndex];
 
         // if no shape exists, create one
-        if (!_shape) {
+        if (!shape) {
             const newShape = CreateBaseShape();
 
 
@@ -412,7 +409,7 @@ export class Editor {
                 this.setSelectedPathIndex(0);
 
                 // update local variables for this function
-                _shape = newShape;
+                shape = newShape;
                 shapeIndex = newShapes.length - 1;
                 pathIndex = 0;
 
@@ -420,7 +417,7 @@ export class Editor {
             });
         }
 
-        const path = _shape.paths[pathIndex];
+        const path = shape.paths[pathIndex];
         if (!path) return;
 
         const cam = this.cameraRef.current;
@@ -476,8 +473,9 @@ export class Editor {
                 })
             );
 
-            this.setSelectedPointIndex(path.points.length);
-            this.startDraggingPoint(path.points.length);
+            const newIndex = path.points.length;
+            this.setSelectedPointIndex(newIndex);
+            this.startDraggingPoint(newIndex);
         }
     }
 
@@ -504,8 +502,12 @@ export class Editor {
             })
         );
     }
-    startHandleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
+
+    // POINT HANDLES
+    startHandleDrag = (e: React.MouseEvent, index: number, handleIn: boolean) => {
         if (!this.canvasRef.current) return;
+        if (!this.lastMouseRef.current) return;
+        if (!this.draggingRef.current) return;
         this.lastMouseRef.current = getCanvasMousePos(e, this.canvasRef.current);
         this.draggingRef.current = { index, handleIn };
         window.addEventListener("mousemove", this.onHandleMouseMove);
@@ -514,14 +516,14 @@ export class Editor {
     }
 
     // POINT HANDLES
-    onHandleMouseMove(e: MouseEvent) {
+    onHandleMouseMove = (e: MouseEvent) => {
         if (!this.draggingRef.current) return;
         this.handleDrag(e as unknown as React.MouseEvent, this.draggingRef.current.index, this.draggingRef.current.handleIn);
     }
 
 
     // POINT HANDLES
-    handleDrag(e: React.MouseEvent, index: number, handleIn: boolean) {
+    handleDrag = (e: React.MouseEvent, index: number, handleIn: boolean) => {
         if (!this.canvasRef.current || !this.lastMouseRef.current) return;
 
         const cmp = getCanvasMousePos(e, this.canvasRef.current);
@@ -553,8 +555,8 @@ export class Editor {
         this.lastMouseRef.current = cmp;
     }
 
-
-    stopHandleDrag() {
+    // POINT HANDLES
+    stopHandleDrag = () => {
         // if no drag is in progress, just remove listeners and exit
         if (!this.draggingRef.current || !this.dragDeltaRef.current) {
             window.removeEventListener("mousemove", this.onHandleMouseMove);
@@ -595,15 +597,18 @@ export class Editor {
 
         this.dragDeltaRef.current = null;
         this.draggingRef.current = null;
+        this.lastMouseRef.current = null;
         window.removeEventListener("mousemove", this.onHandleMouseMove);
         window.removeEventListener("mouseup", this.stopHandleDrag);
     }
+
     changeDetected(): boolean {
         const current = this.historyRef.current.present.shapes;
         const lastPast = this.historyRef.current.past[this.historyRef.current.past.length - 1]?.shapes;
 
         return !shapesEqual(current, lastPast);
     }
+
     handleAddCurveToPoint(index: number) {
         this.commit(prevShapes =>
             prevShapes.map((s, i) => {
@@ -657,12 +662,14 @@ export class Editor {
             })
         );
 
-        this.setSelectedPointIndex((prev: number) => {
-            if (prev === null) return 0;
-            if (prev === index) return 0;
-            if (prev > index) return prev - 1;
-            return prev;
-        });
+        if (this.selectedPointIndex === null) {
+            this.selectedPointIndex = 0;
+        } else if (this.selectedPointIndex === index) {
+            this.selectedPointIndex = 0;
+        } else if (this.selectedPointIndex > index) {
+            this.selectedPointIndex -= 1;
+        }
+        // else leave it as-is
     }
 
     moveForward() {
@@ -963,31 +970,4 @@ export class Editor {
             p.out.y = center.y + (p.out.y - center.y) * scaleFactor;
         }
     }
-
-    // handleRemovePoint(index: number,selectedShapeIndex:number,selectedPathIndex:number) {
-
-    //     commit(prevShapes =>
-    //         prevShapes.map((s, i) => {
-    //             if (i !== selectedShapeIndex) return s;
-
-    //             const newPaths = [...s.paths];
-    //             const currentPath = { ...newPaths[selectedPathIndex] };
-
-    //             currentPath.points = currentPath.points.filter(
-    //                 (_p, idx) => idx !== index
-    //             );
-
-    //             newPaths[selectedPathIndex] = currentPath;
-
-    //             return { ...s, paths: newPaths };
-    //         })
-    //     );
-
-    //     setSelectedPointIndex(prev => {
-    //         if (prev === null) return 0;
-    //         if (prev === index) return 0;
-    //         if (prev > index) return prev - 1;
-    //         return prev;
-    //     });
-    // }
 }

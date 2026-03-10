@@ -1,4 +1,4 @@
-import type { ToolEnum } from "./Main";
+import type { ToolEnum } from "../components/Main";
 
 export function toolTooltip(tool: ToolEnum): string {
     switch (tool) {
@@ -18,5 +18,7 @@ export function toolTooltip(tool: ToolEnum): string {
             return "Drag to pan";
         case "Frame":
             return "Drag to scale frame, hold shift to scale uniformly, hold ctrl to move frame ";
+        default:
+            return "No tool selected";
     }
 }

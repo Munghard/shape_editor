@@ -1,15 +1,24 @@
 import type { Editor } from "../Editor/Editor";
+import { getCanvasMousePos } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class SelectTool extends Tool {
 
-    onMouseDown(_e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, _editor: Editor): void {
-
+    onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D, editor: Editor): void {
+        this.isDragging = true;
+        const cmp = getCanvasMousePos(e, ctx.canvas);
+        editor.lastMouseRef.current = {
+            x: cmp.x,
+            y: cmp.y,
+        };
     }
     onMouseMove(_e: React.MouseEvent<HTMLCanvasElement>, _editor: Editor): void { }
-    onMouseUp(_e: MouseEvent, _editor: Editor): void { }
-    onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
-        editor.setSelectedPointIndex(knobIndex);
-        editor.startDraggingPoint(knobIndex);
+    onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>, _editor: Editor): void {
+        this.isDragging = false;
+        _editor.lastMouseRef.current = null;
+    }
+    onMouseDownKnob(_e: React.MouseEvent<HTMLDivElement>, editor: Editor, index: number): void {
+        editor.setSelectedPointIndex(index);
+        editor.startDraggingPoint(index);
     }
 }

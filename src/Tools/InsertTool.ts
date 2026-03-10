@@ -31,6 +31,10 @@ export class InsertTool extends Tool {
         }
     }
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
+        if (!editor.historyRef.current) return;
+        if (!editor.canvasRef.current) return;
+        if (!editor.cameraRef.current) return;
+
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
@@ -48,7 +52,6 @@ export class InsertTool extends Tool {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // we are hovering a valid segment
         if (seg !== -1) {
@@ -73,16 +76,15 @@ export class InsertTool extends Tool {
             ctx.fill();
             ctx.stroke();
         }
+        editor.setTick(t => t + 1);
     }
 
-
-
-
-    onMouseUp(_e: MouseEvent, _editor: Editor): void {
+    onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>, _editor: Editor): void {
         this.isDragging = false;
     }
-    onMouseKnob(_e: MouseEvent, editor: Editor, knobIndex: number): void {
-        editor.setSelectedPointIndex(knobIndex);
-        editor.startDraggingPoint(knobIndex);
+
+    onMouseDownKnob(_e: React.MouseEvent<HTMLDivElement>, editor: Editor, index: number): void {
+        editor.setSelectedPointIndex(index);
+        editor.startDraggingPoint(index);
     }
 }
