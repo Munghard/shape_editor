@@ -31,8 +31,8 @@ export class FrameTool extends Tool {
         let screenY = cmp.y;
 
         // delta in screen pixels
-        const dx = (screenX - editor.lastMouseRef.current.x) / editor.cameraRef.current.zoom;
-        const dy = (screenY - editor.lastMouseRef.current.y) / editor.cameraRef.current.zoom;
+        const dx = (screenX - editor.lastMouseRef.current.x) / editor.editorCamera.camera.zoom;
+        const dy = (screenY - editor.lastMouseRef.current.y) / editor.editorCamera.camera.zoom;
 
         this.setFrame(prev => {
             if (e.ctrlKey) {

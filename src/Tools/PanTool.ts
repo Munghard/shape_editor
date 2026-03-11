@@ -28,8 +28,8 @@ export class PanTool extends Tool {
         const dy = screenY - editor.lastMouseRef.current.y;
 
         // convert to world units by dividing by zoom once
-        editor.cameraRef.current.x -= dx / editor.cameraRef.current.zoom;
-        editor.cameraRef.current.y -= dy / editor.cameraRef.current.zoom;
+        editor.editorCamera.camera.x -= dx / editor.editorCamera.camera.zoom;
+        editor.editorCamera.camera.y -= dy / editor.editorCamera.camera.zoom;
 
         editor.lastMouseRef.current.x = screenX;
         editor.lastMouseRef.current.y = screenY;

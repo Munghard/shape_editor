@@ -27,8 +27,8 @@ export class ScaleTool extends Tool {
         editor.lastMouseRef.current.x = screenX;
         editor.lastMouseRef.current.y = screenY;
 
-        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
-        const shapes = editor.historyRef.current.present.shapes;
+        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
+        const shapes = editor.history.present.shapes;
         if (!shape) return;
 
         const center = getShapeCenter(shape);

@@ -28,8 +28,8 @@ export class RotateTool extends Tool {
 
         const dy = screenY - editor.lastMouseRef.current.y;
 
-        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
-        const shapes = editor.historyRef.current.present.shapes;
+        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
+        const shapes = editor.history.present.shapes;
         if (!shape) return;
 
         const center = getShapeCenter(shape);

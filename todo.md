@@ -27,13 +27,14 @@ DONE
 - [x] something wrong with grid rendering when you turn it off
 
 TODO
-    Editor refactor into parts =>
-    Editor/
-    Editor.ts
-    EditorHistory.ts
-    EditorSelection.ts
-    EditorHandles.ts
-    EditorCamera.ts
+- [ ] Editor refactor into parts =>
+- [ ] Editor/
+- [ ] Editor.ts
+- [ ] EditorHistory.ts
+- [ ] EditorSelection.ts
+- [ ] EditorHandles.ts
+- [x] EditorCamera.ts
+
 - [ ] transform for shapes, could add children to shapes and group
 - [ ] add quadratic curve button and (only in or out on point)
 - [ ] preview shapes for live updating when moving curve handles

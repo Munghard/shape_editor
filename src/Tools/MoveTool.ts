@@ -23,14 +23,14 @@ export class MoveTool extends Tool {
         let screenX = cmp.x;
         let screenY = cmp.y;
         // return if no shape selected
-        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
+        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
         if (!shape) return;
         // move all points in paths in shape
 
-        const dx = (screenX - editor.lastMouseRef.current.x) / editor.cameraRef.current.zoom;
-        const dy = (screenY - editor.lastMouseRef.current.y) / editor.cameraRef.current.zoom;
+        const dx = (screenX - editor.lastMouseRef.current.x) / editor.editorCamera.camera.zoom;
+        const dy = (screenY - editor.lastMouseRef.current.y) / editor.editorCamera.camera.zoom;
 
-        const shapes = editor.historyRef.current.present.shapes;
+        const shapes = editor.history.present.shapes;
 
         if (e.ctrlKey) {
             shapes.forEach((shape: Shape) => {

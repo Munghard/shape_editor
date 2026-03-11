@@ -36,7 +36,6 @@ export default function Main() {
         present: { shapes: [] },
         future: []
     });
-    const historyRef = useRef<History>(history)
 
     const [loaded, setLoaded] = useState(false);
 
@@ -59,11 +58,7 @@ export default function Main() {
 
     // CAMERA
     const [, setTick] = useState(0); // this is for forcing rerender on zoom
-    const cameraRef = useRef({
-        x: 0,
-        y: 0,
-        zoom: 1,
-    })
+
     // EDITOR
 
     const [recentFiles, setRecentFiles] = useState<SaveData[]>([]);
@@ -120,7 +115,8 @@ export default function Main() {
 
     // sync historyRef
     useEffect(() => {
-        historyRef.current = history;
+        if (!editorRef.current) return;
+        editorRef.current.history = history;
     }, [history]);
 
     // sync snaptogrid
@@ -132,8 +128,8 @@ export default function Main() {
     // create editor
     useEffect(() => {
         editorRef.current = new Editor(
-            cameraRef,
-            historyRef,
+
+            history,
             draggingRef,
             dragDeltaRef,
             lastMouseRef,
@@ -252,7 +248,7 @@ export default function Main() {
                 return;
             }
             if (e.ctrlKey && key === "d") {
-                const shape = editorRef.current.historyRef.current.present.shapes[editorRef.current.selectedShapeIndex];
+                const shape = editorRef.current.history.present.shapes[editorRef.current.selectedShapeIndex];
                 if (shape) editorRef.current.AddNewShape("", CloneShape(shape));
                 e.preventDefault();
                 return;
@@ -312,11 +308,12 @@ export default function Main() {
     }, [canvasRef.current]);
 
     useEffect(() => {
+        if (!canvasRef.current) return;
+        if (!editorRef.current) return;
 
-        if (canvasRef.current) {
-            cameraRef.current.x = -canvasRef.current.width / 2;
-            cameraRef.current.y = -canvasRef.current.height / 2;
-        }
+        editorRef.current.editorCamera.camera.x = -canvasRef.current.width / 2;
+        editorRef.current.editorCamera.camera.y = -canvasRef.current.height / 2;
+
 
     }, [canvasRef.current]);
 
@@ -449,7 +446,7 @@ export default function Main() {
 
                     <Panel title="Shapes">
                         <div className="flex flex-col gap-2">
-                            {editor.historyRef.current.present.shapes && editor.historyRef.current.present.shapes.map((s, i) => {
+                            {editor.history.present.shapes && editor.history.present.shapes.map((s, i) => {
                                 return (
                                     <div key={i} className="flex flex-col gap-2 ">
                                         <div key={i} className="flex flex-row gap-2 justify-between">
@@ -490,7 +487,7 @@ export default function Main() {
                             {
                                 editorRef.current &&
                                 <p className="absolute w-50% z-40 p-20 text-zinc-500 pointer-events-none">
-                                    sshi:{editor.selectedShapeIndex} editor: {editorRef.current.selectedShapeIndex} spi:{editor.selectedPathIndex} spoi:{editor.selectedPointIndex} ssei:{editor.selectedSegmentIndex} editor history shapes: {editorRef.current.historyRef.current.present.shapes.length}
+                                    sshi:{editor.selectedShapeIndex} editor: {editorRef.current.selectedShapeIndex} spi:{editor.selectedPathIndex} spoi:{editor.selectedPointIndex} ssei:{editor.selectedSegmentIndex} editor history shapes: {editorRef.current.history.present.shapes.length}
                                 </p>
                             }
                         </>
@@ -500,15 +497,15 @@ export default function Main() {
                         <div id="Knobs" className="relative flex-1 overflow-hidden">
 
                             {showKnobs &&
-                                editor.historyRef.current.present.shapes[editor.selectedShapeIndex] && editor.historyRef.current.present.shapes[editor.selectedShapeIndex].paths[editor.selectedPathIndex]?.points.map((p: Point, i: number) => {
+                                editor.history.present.shapes[editor.selectedShapeIndex] && editor.history.present.shapes[editor.selectedShapeIndex].paths[editor.selectedPathIndex]?.points.map((p: Point, i: number) => {
                                     if (canvasRect == null) return;
 
                                     const selected = editor.selectedPointIndex === i;
                                     if (!canvasRef.current) return;
 
-                                    const pointScreen = worldToScreen(p.x, p.y, cameraRef.current, canvasRef.current);
-                                    const inScreen = p.in && worldToScreen(p.in.x, p.in.y, cameraRef.current, canvasRef.current);
-                                    const outScreen = p.out && worldToScreen(p.out.x, p.out.y, cameraRef.current, canvasRef.current);
+                                    const pointScreen = worldToScreen(p.x, p.y, editor.editorCamera.camera, canvasRef.current);
+                                    const inScreen = p.in && worldToScreen(p.in.x, p.in.y, editor.editorCamera.camera, canvasRef.current);
+                                    const outScreen = p.out && worldToScreen(p.out.x, p.out.y, editor.editorCamera.camera, canvasRef.current);
                                     return (
                                         <div key={i}>
                                             <Knob x={pointScreen.x} y={pointScreen.y} i={i} selected={selected} size={knobSize} tool={toolEnum} handleKnobMouseDown={handleKnobMouseDown}></Knob>
@@ -529,10 +526,10 @@ export default function Main() {
                             {/* Export frame */}
                             {toolEnum === "Frame" && canvasRef.current && canvasRef.current && frame &&
                                 (() => {
-                                    const pos = worldToScreen(frame.x, frame.y, cameraRef.current, canvasRef.current);
+                                    const pos = worldToScreen(frame.x, frame.y, editor.editorCamera.camera, canvasRef.current);
                                     return (
                                         <div
-                                            style={{ left: pos.x, top: pos.y, width: frame.w * cameraRef.current.zoom, height: frame.h * cameraRef.current.zoom, boxShadow: "0 0 0 10000px rgba(0,0,0,0.4)" }}
+                                            style={{ left: pos.x, top: pos.y, width: frame.w * editor.editorCamera.camera.zoom, height: frame.h * editor.editorCamera.camera.zoom, boxShadow: "0 0 0 10000px rgba(0,0,0,0.4)" }}
                                             className="absolute pointer-events-none z-30 border border-white overflow-visible"
                                         >
                                             <div className="flex flex-col -translate-y-24 absolute ">
@@ -877,17 +874,17 @@ export default function Main() {
                         <Panel title="Camera">
                             <div className="flex flex-row gap-2">
                                 <div className="flex flex-row gap-2">
-                                    <label>X: </label><input type="number" className="w-20" value={cameraRef.current.x.toFixed(1)} onChange={(e) => cameraRef.current.x = Number(e.target.value)}></input>
+                                    <label>X: </label><input type="number" className="w-20" value={editor.editorCamera.camera.x.toFixed(1)} onChange={(e) => editor.editorCamera.camera.x = Number(e.target.value)}></input>
                                 </div>
                                 <div className="flex flex-row gap-2">
-                                    <label>Y: </label><input type="number" className="w-20" value={cameraRef.current.y.toFixed(1)} onChange={(e) => cameraRef.current.y = Number(e.target.value)}></input>
+                                    <label>Y: </label><input type="number" className="w-20" value={editor.editorCamera.camera.y.toFixed(1)} onChange={(e) => editor.editorCamera.camera.y = Number(e.target.value)}></input>
                                 </div>
                             </div>
                             <div className="flex flex-row gap-2">
-                                <label>Zoom: </label><p className="w-20" >{cameraRef.current.zoom.toFixed(1)}</p>
+                                <label>Zoom: </label><p className="w-20" >{editor.editorCamera.camera.zoom.toFixed(1)}</p>
                             </div>
-                            <button onClick={(_e) => { editor.resetCamera() }}>Reset</button>
-                            <button onClick={(_e) => { editor.centerCamera() }}>Center</button>
+                            <button onClick={(_e) => { editor.editorCamera.resetCamera() }}>Reset</button>
+                            <button onClick={(_e) => { editor.editorCamera.centerCamera() }}>Center</button>
                         </Panel>
 
                         <Panel title="File">

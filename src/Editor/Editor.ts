@@ -1,20 +1,21 @@
-import type { Camera } from "./Camera"
+import { EditorCamera } from "./Camera"
 import type { History } from "../Editor/History"
 import type { ITool } from "../Tools/ITool";
 import { CreateBaseShape, CreateCircle, CreateSquare, CreateTriangle, DrawShape, type Path, type Point, type Shape } from "./Shape";
-import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getShapeCenter, lerpVec2, screenToWorld, shapesEqual } from "../Utilities/Utilities";
+import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, lerpVec2, screenToWorld, shapesEqual } from "../Utilities/Utilities";
 import { DrawHandleLines } from "./OverlayCanvas";
 import { DrawGrid } from "../Editor/Grid";
 import React from "react";
 
 export class Editor {
     canvasRef: React.RefObject<HTMLCanvasElement | null> = React.createRef();
-    cameraRef: React.RefObject<Camera>;
-    historyRef: React.RefObject<History>;
+    history: History;
     lastMouseRef: React.RefObject<{ x: number; y: number } | null>;
     draggingRef: React.RefObject<{ index: number, handleIn: boolean } | null>;
     dragDeltaRef: React.RefObject<{ index: number, handleIn: boolean, dx: number, dy: number } | null>;
     activeTool: ITool | null;
+
+    editorCamera: EditorCamera = new EditorCamera(this);
 
     public selectedShapeIndex: number = -1;
     public selectedPathIndex: number = -1;
@@ -35,8 +36,7 @@ export class Editor {
 
 
     constructor(
-        cameraRef: React.RefObject<Camera>,
-        historyRef: React.RefObject<History>,
+        history: History,
         draggingRef: React.RefObject<{ index: number, handleIn: boolean } | null>,
         dragDeltaRef: React.RefObject<{ index: number, handleIn: boolean, dx: number, dy: number } | null>,
         lastMouseRef: React.RefObject<{ x: number, y: number } | null>,
@@ -48,8 +48,7 @@ export class Editor {
         setTick: React.Dispatch<React.SetStateAction<number>>,
 
     ) {
-        this.cameraRef = cameraRef;
-        this.historyRef = historyRef;
+        this.history = history;
         this.draggingRef = draggingRef;
         this.dragDeltaRef = dragDeltaRef;
         this.lastMouseRef = lastMouseRef;
@@ -85,13 +84,13 @@ export class Editor {
     }
 
     get shape(): Shape {
-        return this.historyRef.current.present.shapes[this.selectedShapeIndex];
+        return this.history.present.shapes[this.selectedShapeIndex];
     }
     get path(): Path {
-        return this.historyRef.current.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex];
+        return this.history.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex];
     }
     get point(): Point {
-        return this.historyRef.current.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
+        return this.history.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
     }
 
 
@@ -168,7 +167,7 @@ export class Editor {
 
         newShape = CloneShape(newShape);
 
-        const newIndex = this.historyRef.current.present.shapes.length;
+        const newIndex = this.history.present.shapes.length;
 
         this.commit(prev => [...prev, newShape]);
 
@@ -179,7 +178,7 @@ export class Editor {
 
     DeleteSelectedShape(): void {
         if (this.selectedShapeIndex === -1) return;
-        const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
+        const shape = this.history.present.shapes[this.selectedShapeIndex];
         this.commit(prev => [...prev.filter(s => s !== shape)]);
         this.setSelectedShapeIndex(Math.max(this.selectedShapeIndex - 1, 0));
         this.setSelectedSegmentIndex(0);
@@ -205,7 +204,7 @@ export class Editor {
 
 
     AddNewPath(): void {
-        if (this.historyRef.current.present.shapes.length < 1) return;
+        if (this.history.present.shapes.length < 1) return;
         this.commit(prev =>
             prev.map((s, i) => {
                 if (i !== this.selectedShapeIndex) return s;
@@ -218,7 +217,7 @@ export class Editor {
             })
 
         );
-        this.setSelectedPathIndex(this.historyRef.current.present.shapes[this.selectedShapeIndex].paths.length);
+        this.setSelectedPathIndex(this.history.present.shapes[this.selectedShapeIndex].paths.length);
     }
     DeleteSelectedPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
         this.commit(prev =>
@@ -258,7 +257,7 @@ export class Editor {
     }
 
     handleSelectPoint(e: React.ChangeEvent<HTMLInputElement, HTMLInputElement>): void {
-        const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
+        const shape = this.history.present.shapes[this.selectedShapeIndex];
         var index = Number(e.target.value);
         var points = shape.paths[this.selectedPathIndex].points.length;
         index = (index + points) % points;
@@ -272,7 +271,7 @@ export class Editor {
         if (!this.canvasRef.current) return;
         if (this.selectedShapeIndex === -1 || this.selectedPathIndex === -1) return;
 
-        const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
+        const shape = this.history.present.shapes[this.selectedShapeIndex];
         const path = shape.paths[this.selectedPathIndex];
         const startPoint = path.points[index];
 
@@ -282,7 +281,7 @@ export class Editor {
         const onMouseMove = (e: MouseEvent) => {
             if (!this.canvasRef.current) return;
 
-            const camera = this.cameraRef.current;
+            const camera = this.editorCamera.camera;
 
             var cmp = getCanvasMousePos(e, this.canvasRef.current)
             // convert mouse to world coordinates
@@ -342,7 +341,7 @@ export class Editor {
         const canvasX = cmp.x;
         const canvasY = cmp.y;
 
-        const cam = this.cameraRef.current;
+        const cam = this.editorCamera.camera;
 
         // mouse position in world coordinates
         const worldX = cam.x + canvasX / cam.zoom;
@@ -399,7 +398,7 @@ export class Editor {
         if (this.selectedPathIndex === -1) return;
         let shapeIndex = targetIndex;
         let pathIndex = this.selectedPathIndex;
-        let shape = this.historyRef.current.present.shapes[shapeIndex];
+        let shape = this.history.present.shapes[shapeIndex];
 
         // if no shape exists, create one
         if (!shape) {
@@ -424,7 +423,7 @@ export class Editor {
         const path = shape.paths[pathIndex];
         if (!path) return;
 
-        const cam = this.cameraRef.current;
+        const cam = this.editorCamera.camera;
 
         var cmp = getCanvasMousePos(e, this.canvasRef.current)
 
@@ -531,8 +530,8 @@ export class Editor {
         if (!this.canvasRef.current || !this.lastMouseRef.current) return;
 
         const cmp = getCanvasMousePos(e, this.canvasRef.current);
-        const mouseWorld = screenToWorld(cmp.x, cmp.y, this.cameraRef.current);
-        const lastWorld = screenToWorld(this.lastMouseRef.current.x, this.lastMouseRef.current.y, this.cameraRef.current);
+        const mouseWorld = screenToWorld(cmp.x, cmp.y, this.editorCamera.camera);
+        const lastWorld = screenToWorld(this.lastMouseRef.current.x, this.lastMouseRef.current.y, this.editorCamera.camera);
 
         const dx = mouseWorld.x - lastWorld.x;
         const dy = mouseWorld.y - lastWorld.y;
@@ -540,7 +539,7 @@ export class Editor {
         this.dragDeltaRef.current = { index, handleIn, dx, dy };
 
         // Apply delta for live preview by mutating history.present.shapes
-        const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
+        const shape = this.history.present.shapes[this.selectedShapeIndex];
         if (!shape) return;
 
         const path = shape.paths[this.selectedPathIndex];
@@ -610,7 +609,7 @@ export class Editor {
     // ================================================================================================================
 
     changeDetected(): boolean {
-        const history = this.historyRef.current;
+        const history = this.history;
         if (!history.past.length) return true;
 
         const current = history.present.shapes;
@@ -786,46 +785,14 @@ export class Editor {
         localStorage.removeItem("Session");
         if (this.canvasRef.current) ClearCanvas(this.canvasRef.current.getContext("2d")!);
     }
-    // ================================================================================================================
-    // CAMERA
-    // ================================================================================================================
-    resetCamera() {
-        const canvas = this.canvasRef.current;
-        if (!canvas) return;
-        var w = canvas.width;
-        var h = canvas.height;
-        this.cameraRef.current.x = 0 - w / 2;
-        this.cameraRef.current.y = 0 - h / 2;
-        this.cameraRef.current.zoom = 1;
-        this.Draw();
-        this.ReDrawGrid();
-    }
-
-    centerCamera() {
-        const canvas = this.canvasRef.current;
-        if (!canvas || !this.shape) return;
-
-        const center = getShapeCenter(this.shape);
-        const zoom = this.cameraRef.current.zoom;
-
-        this.cameraRef.current.x = center.x - canvas.width / (2 * zoom);
-        this.cameraRef.current.y = center.y - canvas.height / (2 * zoom);
-
-        this.Draw();
-        this.ReDrawGrid();
-    }
-
-    // ================================================================================================================
-    // CAMERA
-    // ================================================================================================================
 
     selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
         let foundShapeIndex = -1;
         let nextPathIndex = -1;
 
         // loop from top-most shape down
-        for (let i = this.historyRef.current.present.shapes.length - 1; i >= 0; i--) {
-            const shape = this.historyRef.current.present.shapes[i];
+        for (let i = this.history.present.shapes.length - 1; i >= 0; i--) {
+            const shape = this.history.present.shapes[i];
             this.buildPath(ctx, shape);
 
             if (ctx.isPointInPath(x, y)) {
@@ -833,7 +800,7 @@ export class Editor {
 
                 if (i === this.selectedShapeIndex) {
                     // cycle to next path
-                    const pathCount = this.historyRef.current.present.shapes[i].paths.length;
+                    const pathCount = this.history.present.shapes[i].paths.length;
                     nextPathIndex = (this.selectedPathIndex + 1) % pathCount;
                 } else {
                     nextPathIndex = 0;
@@ -892,7 +859,7 @@ export class Editor {
         if (!c) return;
         var ctx = c.getContext("2d") as CanvasRenderingContext2D;
         ClearCanvas(ctx);
-        DrawGrid(ctx, this.gridColor, this.gridAlpha, this.gridSubdivisions, this.cameraRef.current);
+        DrawGrid(ctx, this.gridColor, this.gridAlpha, this.gridSubdivisions, this.editorCamera.camera);
     }
 
     Draw() {
@@ -904,9 +871,9 @@ export class Editor {
 
         ClearCanvas(ctx);
 
-        ctx.setTransform(this.cameraRef.current.zoom, 0, 0, this.cameraRef.current.zoom, -this.cameraRef.current.x * this.cameraRef.current.zoom, -this.cameraRef.current.y * this.cameraRef.current.zoom)
+        ctx.setTransform(this.editorCamera.camera.zoom, 0, 0, this.editorCamera.camera.zoom, -this.editorCamera.camera.x * this.editorCamera.camera.zoom, -this.editorCamera.camera.y * this.editorCamera.camera.zoom)
 
-        this.historyRef.current.present.shapes.forEach((shape, i) => {
+        this.history.present.shapes.forEach((shape, i) => {
             if (!this.hiddenShapeIndicies.includes(i)) {
                 DrawShape(ctx, shape);
             }
@@ -919,13 +886,13 @@ export class Editor {
             this.selectedShapeIndex !== -1 &&
                 this.selectedPathIndex !== -1 &&
                 this.selectedPointIndex !== -1
-                ? this.historyRef.current.present.shapes[this.selectedShapeIndex]
+                ? this.history.present.shapes[this.selectedShapeIndex]
                     ?.paths[this.selectedPathIndex]
                     ?.points[this.selectedPointIndex]
                 : null;
         if (selectedPoint) {
             ClearCanvas(coctx);
-            DrawHandleLines(coctx, selectedPoint, this.cameraRef.current, coCanvas)
+            DrawHandleLines(coctx, selectedPoint, this.editorCamera.camera, coCanvas)
         }
         else {
             ClearCanvas(coctx);

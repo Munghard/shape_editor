@@ -10,7 +10,7 @@ export class InsertTool extends Tool {
         let targetIndex = editor.selectedShapeIndex;
         if (e.shiftKey) {
             editor.AddNewShape("empty"); // this should also select it
-            targetIndex = editor.historyRef.current.present.shapes.length;
+            targetIndex = editor.history.present.shapes.length;
         }
         else if (e.ctrlKey) {
             editor.AddNewPath();
@@ -22,9 +22,9 @@ export class InsertTool extends Tool {
         }
     }
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
-        if (!editor.historyRef.current) return;
+        if (!editor.history) return;
         if (!editor.canvasRef.current) return;
-        if (!editor.cameraRef.current) return;
+        if (!editor.editorCamera.camera) return;
 
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
@@ -33,8 +33,8 @@ export class InsertTool extends Tool {
 
         const threshold = 10; // pixels
 
-        const worldPos = screenToWorld(screenX, screenY, editor.cameraRef.current);
-        const shape = editor.historyRef.current.present.shapes[editor.selectedShapeIndex];
+        const worldPos = screenToWorld(screenX, screenY, editor.editorCamera.camera);
+        const shape = editor.history.present.shapes[editor.selectedShapeIndex];
         var seg = getHoveredSegment(shape, threshold, worldPos.x, worldPos.y, editor.selectedPathIndex);
         editor.setSelectedSegmentIndex(seg);
 
@@ -57,7 +57,7 @@ export class InsertTool extends Tool {
 
             var pos = cubicBezierPoint(0.5, start, c1, c2, end);
 
-            const { x, y } = worldToScreen(pos.x, pos.y, editor.cameraRef.current, editor.canvasRef.current);
+            const { x, y } = worldToScreen(pos.x, pos.y, editor.editorCamera.camera, editor.canvasRef.current);
             ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             ctx.beginPath();
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
