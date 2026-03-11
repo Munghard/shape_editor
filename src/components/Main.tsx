@@ -421,6 +421,8 @@ export default function Main() {
 
         LoadFile(setFileName, editorRef.current.commit, setShowGrid, setSnapToGrid, editorRef.current?.setGridSubdivisions);
     }
+    // const editor = editorRef.current;
+
 
     return (
         <>
@@ -593,7 +595,7 @@ export default function Main() {
                                     <button title="Delete point" onClick={() => editorRef.current?.handleRemovePoint(editorRef.current?.selectedPointIndex)}><i className="fa-solid fa-x"></i></button>
                                     <button title="Curve point" onClick={() => editorRef.current?.handleAddCurveToPoint(editorRef.current?.selectedPointIndex)}><i className="fa-solid fa-bezier-curve"></i></button>
                                 </div>
-                                {editorRef.current?.selectedPointIndex !== -1 && editorRef.current?.selectedPointIndex && editorRef.current?.historyRef.current.present.shapes[editorRef.current?.selectedShapeIndex] &&
+                                {editorRef.current?.selectedPointIndex !== -1 && editorRef.current?.point && editorRef.current?.shape &&
                                     (
                                         <div className="flex flex-row gap-2">
                                             <div className="flex flex-row gap-2">
@@ -601,11 +603,11 @@ export default function Main() {
                                                 <input
                                                     className="w-[10ch]"
                                                     type="number"
-                                                    value={editorRef.current?.getSelectedPoint().x.toFixed(3)}
+                                                    value={editorRef.current?.point?.x.toFixed(3)}
                                                     onChange={(e) =>
                                                         editorRef.current?.MovePointByIndex(
                                                             editorRef.current.selectedPointIndex,
-                                                            { x: Number(e.target.value), y: editorRef.current?.getSelectedPoint().y }
+                                                            { x: Number(e.target.value), y: editorRef.current?.point?.y }
                                                         )}
                                                 ></input>
                                             </div>
@@ -614,11 +616,11 @@ export default function Main() {
                                                 <input
                                                     className="w-[10ch]"
                                                     type="number"
-                                                    value={editorRef.current?.getSelectedPoint().y.toFixed(3)}
+                                                    value={editorRef.current?.point?.y.toFixed(3)}
                                                     onChange={(e) =>
                                                         editorRef.current?.MovePointByIndex(
                                                             editorRef.current.selectedPointIndex,
-                                                            { x: editorRef.current?.getSelectedPoint().x, y: Number(e.target.value) }
+                                                            { x: editorRef.current?.point?.x, y: Number(e.target.value) }
                                                         )}
                                                 ></input>
                                             </div>
@@ -636,15 +638,15 @@ export default function Main() {
                             </div>
                         </Panel>
                         {
-                            editorRef.current?.getSelectedShape() &&
+                            editorRef.current?.shape &&
 
                             <Panel title="Shape">
                                 {/* <p>Shapes: {history.present.shapes.length}</p> */}
                                 <p>Selected shape:
                                     <input className="ml-2 w-[10ch]" type="number" value={editorRef.current?.selectedShapeIndex} min={0} max={history.present.shapes.length - 1} onChange={(e) => { editorRef.current?.setSelectedShapeIndex(Number(e.target.value)); editorRef.current?.setSelectedPathIndex(0); editorRef.current?.setSelectedPointIndex(0); }}></input>
                                 </p>
-                                <label>Name: <input type="text" value={editorRef.current?.getSelectedShape().name} onChange={(e) => editorRef.current?.setShapeName(e.target.value, editorRef.current.selectedShapeIndex)}></input></label>
-                                <button onClick={(_e) => editorRef.current?.AddNewShape("", CloneShape(editorRef.current?.getSelectedShape()))}>Duplicate</button>
+                                <label>Name: <input type="text" value={editorRef.current?.shape.name} onChange={(e) => editorRef.current?.setShapeName(e.target.value, editorRef.current.selectedShapeIndex)}></input></label>
+                                <button onClick={(_e) => editorRef.current?.AddNewShape("", CloneShape(editorRef.current?.shape))}>Duplicate</button>
                                 <div className="flex flex-row gap-2">
                                     <p>Order:</p>
                                     <button onClick={editorRef.current?.moveForward}><i className="fa fa-arrow-up"></i></button>
@@ -655,9 +657,9 @@ export default function Main() {
                                 </div>
                             </Panel>
                         }
-                        {editorRef.current?.getSelectedShape() &&
+                        {editorRef.current?.shape &&
                             <Panel title="Paths">
-                                <p>Paths: {editorRef.current?.getSelectedShape().paths.length}</p>
+                                <p>Paths: {editorRef.current?.shape.paths.length}</p>
                                 <p>Selected path:
                                     <input className="ml-2 w-[10ch]" type="number" value={editorRef.current?.selectedPathIndex} min={0} max={history.present.shapes[editorRef.current?.selectedShapeIndex]?.paths.length - 1} onChange={(e) => editorRef.current?.setSelectedPathIndex(Number(e.target.value))}></input>
                                 </p>
@@ -673,14 +675,14 @@ export default function Main() {
                                         <input
                                             className="colorSelect"
                                             type="color"
-                                            value={editorRef.current?.getSelectedShape()?.strokeColor}
+                                            value={editorRef.current?.shape?.strokeColor}
                                             onChange={(e) =>
                                                 editorRef.current?.updateSelectedShape(s => ({ ...s, strokeColor: e.target.value }))
                                             }
                                         />
                                         <input
                                             type="checkbox"
-                                            checked={editorRef.current?.getSelectedShape()?.useStroke}
+                                            checked={editorRef.current?.shape?.useStroke}
                                             onChange={(e) =>
                                                 editorRef.current?.updateSelectedShape(s => ({ ...s, useStroke: e.target.checked }))
                                             }
@@ -697,14 +699,14 @@ export default function Main() {
                                         <input
                                             className="colorSelect"
                                             type="color"
-                                            value={editorRef.current?.getSelectedShape()?.fillColor}
+                                            value={editorRef.current?.shape?.fillColor}
                                             onChange={(e) =>
                                                 editorRef.current?.updateSelectedShape(s => ({ ...s, fillColor: e.target.value }))
                                             }
                                         />
                                         <input
                                             type="checkbox"
-                                            checked={editorRef.current?.getSelectedShape()?.useFill}
+                                            checked={editorRef.current?.shape?.useFill}
                                             onChange={(e) =>
                                                 editorRef.current?.updateSelectedShape(s => ({ ...s, useFill: e.target.checked }))
                                             }
@@ -717,11 +719,11 @@ export default function Main() {
                                     <div className="flex flex-row gap-2">
 
                                         <label>Stroke width: </label>
-                                        <input className="w-14" type="number" value={editorRef.current?.getSelectedShape()?.strokeWidth} onChange={(e) => editorRef.current?.updateSelectedShape(s => ({ ...s, strokeWidth: Number(e.target.value) }))}></input>
+                                        <input className="w-14" type="number" value={editorRef.current?.shape?.strokeWidth} onChange={(e) => editorRef.current?.updateSelectedShape(s => ({ ...s, strokeWidth: Number(e.target.value) }))}></input>
                                     </div>
                                     <input
                                         type="range"
-                                        value={editorRef.current?.getSelectedShape()?.strokeWidth}
+                                        value={editorRef.current?.shape?.strokeWidth}
                                         min={1}
                                         max={128}
                                         onChange={(e) =>
@@ -735,7 +737,7 @@ export default function Main() {
                                     <label>Closed shape</label>
                                     <input
                                         type="checkbox"
-                                        checked={editorRef.current?.getSelectedShape()?.cyclic}
+                                        checked={editorRef.current?.shape?.cyclic}
                                         onChange={(e) =>
                                             editorRef.current?.updateSelectedShape(s => ({ ...s, cyclic: e.target.checked }))
                                         }
@@ -931,8 +933,8 @@ export default function Main() {
                             </div>
                         </Panel>
                     </div>
-                </PanelContainer>
-            </div>
+                </PanelContainer >
+            </div >
         </>
     )
 }

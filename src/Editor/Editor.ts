@@ -1,7 +1,7 @@
 import type { Camera } from "./Camera"
 import type { History } from "../Editor/History"
 import type { ITool } from "../Tools/ITool";
-import { CreateBaseShape, CreateCircle, CreateSquare, CreateTriangle, DrawShape, type Point, type Shape } from "./Shape";
+import { CreateBaseShape, CreateCircle, CreateSquare, CreateTriangle, DrawShape, type Path, type Point, type Shape } from "./Shape";
 import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getShapeCenter, lerpVec2, screenToWorld, shapesEqual } from "../Utilities/Utilities";
 import { DrawHandleLines } from "./OverlayCanvas";
 import { DrawGrid } from "../Editor/Grid";
@@ -20,6 +20,7 @@ export class Editor {
     public selectedPathIndex: number = -1;
     public selectedPointIndex: number = -1;
     public selectedSegmentIndex: number = -1;
+
     public hiddenShapeIndicies: number[] = [];
 
     public snapToGrid: boolean = false;
@@ -61,15 +62,6 @@ export class Editor {
 
         this.setTick = setTick;
     }
-    // auto updating selectedpoint logic
-    // const selectedPoint =
-    //     selectedShapeIndex !== -1 &&
-    //         selectedPathIndex !== -1 &&
-    //         selectedPointIndex !== -1
-    //         ? history.present.shapes[selectedShapeIndex]
-    //             ?.paths[selectedPathIndex]
-    //             ?.points[selectedPointIndex]
-    //         : null;
 
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D) {
         this.activeTool?.onMouseDown(e, ctx, this)
@@ -88,12 +80,17 @@ export class Editor {
         this.activeTool?.onMouseDownKnob(e, this, index)
     }
 
-    getSelectedPoint(): Point {
-        return this.historyRef.current.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
-    }
-    getSelectedShape(): Shape {
+    get shape(): Shape {
         return this.historyRef.current.present.shapes[this.selectedShapeIndex];
     }
+    get path(): Path {
+        return this.historyRef.current.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex];
+    }
+    get point(): Point {
+        return this.historyRef.current.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
+    }
+
+
     setSelectedShapeIndex(index: number) {
         this.selectedShapeIndex = index;
         this.setTick(t => t + 1);
