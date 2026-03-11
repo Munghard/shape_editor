@@ -23,13 +23,20 @@ DONE
 - [x] collapsible panels, make panel2 into a component with children and headertitle
 - [x] add hotkeys for delete selection, shape, point, path (delete) . duplicate (ctrl + D, alt + move)
 - [x] camera panel,center camera button
+- [x] separate tools to its own file
+- [x] something wrong with grid rendering when you turn it off
 
 TODO
-- [ ] separate tools to its own file
+    Editor refactor into parts =>
+    Editor/
+    Editor.ts
+    EditorHistory.ts
+    EditorSelection.ts
+    EditorHandles.ts
+    EditorCamera.ts
 - [ ] transform for shapes, could add children to shapes and group
 - [ ] add quadratic curve button and (only in or out on point)
 - [ ] preview shapes for live updating when moving curve handles
-- [ ] something wrong with grid rendering when you turn it off
 - [ ] export to svg, maybe other formats too
 - [ ] Multi select, add new type PointSelect = {shapeIndex:number,pathIndex:number,pointIndex:number} > instead of selectedPointIndex, when you select a point add a new PointSelect to an array to track what shape and path the point belongs to, this should also allow to show all path points at the same time instead of just selected path
 

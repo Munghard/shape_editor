@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, type RefObject } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { CloneShape, getRandomColor, worldToScreen } from "../Utilities/Utilities";
 import { type Point, type Rect, type Path } from "../Editor/Shape";
 import { type SaveData } from "./SaveData";
@@ -392,9 +392,9 @@ export default function Main() {
     function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
         if (!editorRef.current) return;
         editorRef.current.onMouseUp(e);
-        if (editorRef.current.changeDetected()) {
-            editorRef.current.commit(() => history.present.shapes);
-        }
+        // if (editorRef.current.changeDetected()) {
+        //     editorRef.current.commit(() => history.present.shapes);
+        // }
     }
 
     function handleKnobSize(e: React.ChangeEvent<HTMLInputElement, Element>) {

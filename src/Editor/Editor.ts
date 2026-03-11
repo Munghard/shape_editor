@@ -64,6 +64,10 @@ export class Editor {
         this.canvasRef.current = canvas;
     }
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D) {
+        if (this.changeDetected()) {
+            this.commit(prev => prev); // commit before change
+        }
+
         this.activeTool?.onMouseDown(e, ctx, this)
         const cmp = getCanvasMousePos(e, ctx.canvas);
         this.selectShapeAt(ctx, cmp.x, cmp.y);
@@ -606,12 +610,14 @@ export class Editor {
     // ================================================================================================================
 
     changeDetected(): boolean {
-        const current = this.historyRef.current.present.shapes;
-        const lastPast = this.historyRef.current.past[this.historyRef.current.past.length - 1]?.shapes;
+        const history = this.historyRef.current;
+        if (!history.past.length) return true;
+
+        const current = history.present.shapes;
+        const lastPast = history.past[history.past.length - 1].shapes;
 
         return !shapesEqual(current, lastPast);
     }
-
     handleAddCurveToPoint(index: number) {
         this.commit(prevShapes =>
             prevShapes.map((s, i) => {
@@ -704,21 +710,35 @@ export class Editor {
 
     // type Commit = (updater: (prev: Shape[]) => Shape[]) => void;
 
+    // ================================================================================================================
+    // HISTORY
+    // ================================================================================================================
+
     commit(updater: (prevShapes: Shape[]) => Shape[]) {
         this.setHistory(prev => {
-            const newShapes = updater(prev.present.shapes).map(s => ({
-                ...s,
-                paths: s.paths.map(p => ({ ...p, points: [...p.points] }))
-            }));
 
             return {
-                past: [...prev.past, JSON.parse(JSON.stringify(prev.present))], // deep copy
-                present: { shapes: newShapes },
+                past: [...prev.past, prev.present],
+                present: {
+                    shapes: this.cloneShapes(updater(prev.present.shapes))
+                },
                 future: []
             };
         });
     }
-
+    cloneShapes(shapes: Shape[]): Shape[] {
+        return shapes.map(s => ({
+            ...s,
+            paths: s.paths.map(p => ({
+                ...p,
+                points: p.points.map(pt => ({
+                    ...pt,
+                    in: pt.in ? { ...pt.in } : undefined,
+                    out: pt.out ? { ...pt.out } : undefined
+                }))
+            }))
+        }));
+    }
     undo() {
         this.setHistory(prev => {
             if (prev.past.length === 0) return prev;
@@ -745,6 +765,11 @@ export class Editor {
             };
         });
     }
+
+    // ================================================================================================================
+    // HISTORY
+    // ================================================================================================================
+
     setShapeName(name: string, index: number): void {
         this.commit(prev =>
             prev.map((p, i) =>
@@ -761,9 +786,10 @@ export class Editor {
         localStorage.removeItem("Session");
         if (this.canvasRef.current) ClearCanvas(this.canvasRef.current.getContext("2d")!);
     }
-
+    // ================================================================================================================
+    // CAMERA
+    // ================================================================================================================
     resetCamera() {
-
         const canvas = this.canvasRef.current;
         if (!canvas) return;
         var w = canvas.width;
@@ -777,12 +803,9 @@ export class Editor {
 
     centerCamera() {
         const canvas = this.canvasRef.current;
+        if (!canvas || !this.shape) return;
 
-        const shape = this.historyRef.current.present.shapes[this.selectedShapeIndex];
-
-        if (!canvas || !shape) return;
-
-        const center = getShapeCenter(shape);
+        const center = getShapeCenter(this.shape);
         const zoom = this.cameraRef.current.zoom;
 
         this.cameraRef.current.x = center.x - canvas.width / (2 * zoom);
@@ -791,6 +814,10 @@ export class Editor {
         this.Draw();
         this.ReDrawGrid();
     }
+
+    // ================================================================================================================
+    // CAMERA
+    // ================================================================================================================
 
     selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
         let foundShapeIndex = -1;

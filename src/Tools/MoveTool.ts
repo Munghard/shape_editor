@@ -16,6 +16,7 @@ export class MoveTool extends Tool {
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
         if (!editor.lastMouseRef.current) return;
+        if (!editor.canvasRef.current) return;
         console.log("moving");
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 

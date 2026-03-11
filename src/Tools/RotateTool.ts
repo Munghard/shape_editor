@@ -16,6 +16,8 @@ export class RotateTool extends Tool {
     onMouseMove(e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         if (!this.isDragging) return;
         if (!editor.lastMouseRef.current) return;
+        if (!editor.canvasRef.current) return;
+
         const cmp = getCanvasMousePos(e, editor.canvasRef.current)
 
         let screenX = cmp.x;
