@@ -4,15 +4,6 @@ import { cubicBezierPoint, getCanvasMousePos, screenToWorld, worldToScreen } fro
 import { Tool } from "./Tool";
 
 export class InsertTool extends Tool {
-    private ClearOverlayCanvas: () => void;
-
-
-    constructor(
-        ClearOverlayCanvas: () => void,
-    ) {
-        super();
-        this.ClearOverlayCanvas = ClearOverlayCanvas;
-    }
 
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, _ctx: CanvasRenderingContext2D, editor: Editor): void {
         this.isDragging = true;
@@ -25,7 +16,7 @@ export class InsertTool extends Tool {
             editor.AddNewPath();
         }
         else {
-            this.ClearOverlayCanvas();
+            editor.ClearOverlayCanvas();
             editor.handleCreatePoint(e as unknown as React.MouseEvent<HTMLCanvasElement>, targetIndex);
 
         }

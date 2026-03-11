@@ -3,6 +3,7 @@ import { hexToRgba } from "../Utilities/Utilities";
 import type { Camera } from "../Editor/Camera";
 
 export function ClearGrid(ctx: CanvasRenderingContext2D) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     const canvasWidth = ctx.canvas.width;
     const canvasHeight = ctx.canvas.height;
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);

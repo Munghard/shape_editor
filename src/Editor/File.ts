@@ -1,5 +1,5 @@
 
-import { MAX_RECENT, RECENTFILESKEY } from "../components/Main";
+import { MAX_RECENT, RECENTFILESKEY } from "../Constants";
 import type { SaveData } from "../components/SaveData";
 import { DrawShape, type Rect, type Shape } from "./Shape";
 

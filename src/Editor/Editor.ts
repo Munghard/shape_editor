@@ -84,8 +84,8 @@ export class Editor {
     onMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
         this.activeTool?.onMouseUp(e, this)
     }
-    onMouseDownKnob(e: React.MouseEvent<HTMLDivElement>) {
-        this.activeTool?.onMouseDownKnob(e, this, this.selectedPointIndex)
+    onMouseDownKnob(e: React.MouseEvent<HTMLDivElement>, index: number) {
+        this.activeTool?.onMouseDownKnob(e, this, index)
     }
 
     getSelectedPoint(): Point {
@@ -118,23 +118,26 @@ export class Editor {
     handleClickAddShape(shape: string): void {
         this.AddNewShape(shape);
     }
+
     setGridColor(color: string) {
         this.gridColor = color;
         this.ReDrawGrid();
     }
+
     setGridAlpha(alpha: number) {
         this.gridAlpha = alpha;
         this.ReDrawGrid();
     }
 
-    setSnapToGrid(snapToGrid: boolean) {
-        this.snapToGrid = snapToGrid;
-    }
     setGridSubdivisions(gridSubdivisions: number) {
         this.gridSubdivisions = gridSubdivisions;
     }
 
-
+    ClearOverlayCanvas() {
+        var co = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
+        var coctx = co.getContext("2d") as CanvasRenderingContext2D;
+        ClearCanvas(coctx);
+    }
 
     AddNewShape(shapeName: string, shape: Shape | null = null): Shape {
 
@@ -502,12 +505,12 @@ export class Editor {
             })
         );
     }
-
+    // ================================================================================================================
+    // HANDLES
+    // ================================================================================================================
     // POINT HANDLES
     startHandleDrag = (e: React.MouseEvent, index: number, handleIn: boolean) => {
         if (!this.canvasRef.current) return;
-        if (!this.lastMouseRef.current) return;
-        if (!this.draggingRef.current) return;
         this.lastMouseRef.current = getCanvasMousePos(e, this.canvasRef.current);
         this.draggingRef.current = { index, handleIn };
         window.addEventListener("mousemove", this.onHandleMouseMove);
@@ -601,6 +604,9 @@ export class Editor {
         window.removeEventListener("mousemove", this.onHandleMouseMove);
         window.removeEventListener("mouseup", this.stopHandleDrag);
     }
+    // ================================================================================================================
+    // HANDLES
+    // ================================================================================================================
 
     changeDetected(): boolean {
         const current = this.historyRef.current.present.shapes;

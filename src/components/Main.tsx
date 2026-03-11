@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState, type RefObject } from "react"
-import { ClearCanvas, CloneShape, getRandomColor, worldToScreen } from "../Utilities/Utilities";
+import { CloneShape, getRandomColor, worldToScreen } from "../Utilities/Utilities";
 import { type Point, type Rect, type Path } from "../Editor/Shape";
 import { type SaveData } from "./SaveData";
 import { ExportShape, LoadFile, RemoveFromLocalStorage, SaveFile } from "../Editor/File";
 import type { History } from "../Editor/History";
 import { toolTooltip } from "../Tools/ToolTooltips";
-import { APP_NAME } from "../Constants";
+import { APP_NAME, RECENTFILESKEY } from "../Constants";
 import { Knob } from "./Knob";
 import { Handle } from "./Handle";
 import { Panel } from "./Panel";
@@ -24,8 +24,7 @@ import { ClearGrid } from "../Editor/Grid";
 
 export type ToolEnum = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
 
-export const MAX_RECENT = 5;
-export const RECENTFILESKEY = "recentFiles";
+
 
 export default function Main() {
 
@@ -49,14 +48,10 @@ export default function Main() {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null); // this is for knobs
 
-
-
-
     // VIEW
     const [bgColor, setBgColor] = useState<string>("#282828");
 
     const [showGrid, setShowGrid] = useState<boolean>(true);
-
 
     const [showKnobs, setShowKnobs] = useState<boolean>(true);
     const [knobSize, setKnobSize] = useState<number>(16);
@@ -99,7 +94,7 @@ export default function Main() {
                 handleToolChange(new ScaleTool());
                 break;
             case "Insert":
-                handleToolChange(new InsertTool(ClearOverlayCanvas));
+                handleToolChange(new InsertTool());
                 break;
             case "Pan":
                 handleToolChange(new PanTool());
@@ -107,9 +102,7 @@ export default function Main() {
             case "Frame":
                 handleToolChange(new FrameTool(setFrame));
                 break;
-
         }
-
     }
     const handleToolChange = (tool: Tool) => {
         if (!editorRef.current) return;
@@ -130,7 +123,11 @@ export default function Main() {
         historyRef.current = history;
     }, [history]);
 
-
+    // sync snaptogrid
+    useEffect(() => {
+        if (!editorRef.current) return;
+        editorRef.current.snapToGrid = snapToGrid;
+    }, [snapToGrid]);
 
     // create editor
     useEffect(() => {
@@ -200,7 +197,6 @@ export default function Main() {
     }, [history.present.shapes, knobSize, editorRef.current?.hiddenShapeIndicies, editorRef.current?.selectedPointIndex, editorRef.current?.selectedShapeIndex, editorRef.current?.selectedPathIndex]);
 
 
-
     // DRAW GRID
     useEffect(() => {
         if (!editorRef.current) return;
@@ -213,23 +209,6 @@ export default function Main() {
             ClearGrid(ctx);
         }
     }, [showGrid, editorRef.current?.gridSubdivisions, editorRef.current?.gridAlpha]);
-
-
-
-    // ON SELECTED SHAPE CHANGED SET PATHINDEX TO 0 AND POINT INDEX TO "NULL" ELSE CRASH
-    // useEffect(() => {
-    //     if (selectedShapeIndex !== -1) {
-    //         setSelectedPathIndex(0);
-    //         setSelectedPointIndex(-1);
-    //     }
-    //     else {
-
-    //         setSelectedPathIndex(-1);
-    //         setSelectedPointIndex(-1);
-    //     }
-    // }, [selectedShapeIndex]);
-
-
 
 
     // HOTKEYS
@@ -377,11 +356,13 @@ export default function Main() {
     function handleKnobMouseDown(e: React.MouseEvent<HTMLDivElement>, i: number) {
         if (!tool) return;
         if (!editorRef.current) return;
+        // ROUTE TO EDITOR
+        editorRef.current.onMouseDownKnob(e, i);
+
+        // UI STUFF
         const knob = e.currentTarget as HTMLDivElement;
         knob.style.pointerEvents = "none";
         knob.style.display = "none";
-
-        tool.onMouseDownKnob(e, editorRef.current, i);
 
         function onMouseUp() {
             knob.style.pointerEvents = "auto"; // re-enable after drag
@@ -402,16 +383,11 @@ export default function Main() {
         editorRef.current.onMouseDown(e, ctx)
     }
 
-    function ClearOverlayCanvas() {
-        var co = document.getElementById("CanvasOverlay") as HTMLCanvasElement;
-        var coctx = co.getContext("2d") as CanvasRenderingContext2D;
-        ClearCanvas(coctx);
-    }
 
-    function handleMouseUp(_e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
 
+    function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
         if (!editorRef.current) return;
-        editorRef.current.onMouseUp(_e);
+        editorRef.current.onMouseUp(e);
         if (editorRef.current.changeDetected()) {
             editorRef.current.commit(() => history.present.shapes);
         }
@@ -709,7 +685,7 @@ export default function Main() {
                                                 editorRef.current?.updateSelectedShape(s => ({ ...s, useStroke: e.target.checked }))
                                             }
                                         />
-                                        <button onClick={(_e) => editorRef.current?.updateSelectedShape(s => ({ ...s, strokeColor: getRandomColor() }))}>Randomize</button>
+                                        <button title="Randomize" onClick={(_e) => editorRef.current?.updateSelectedShape(s => ({ ...s, strokeColor: getRandomColor() }))}><i className="fa-solid fa-dice"></i></button>
                                     </div>
                                 </div>
 
@@ -733,7 +709,7 @@ export default function Main() {
                                                 editorRef.current?.updateSelectedShape(s => ({ ...s, useFill: e.target.checked }))
                                             }
                                         />
-                                        <button onClick={(_e) => editorRef.current?.updateSelectedShape(s => ({ ...s, fillColor: getRandomColor() }))}>Randomize</button>
+                                        <button title="Randomize" onClick={(_e) => editorRef.current?.updateSelectedShape(s => ({ ...s, fillColor: getRandomColor() }))}><i className="fa-solid fa-dice"></i></button>
                                     </div>
                                 </div>
                                 {/* Line width */}
@@ -813,7 +789,7 @@ export default function Main() {
                                         />
                                     ))}
                                 </div>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col gap-0.5">
                                     <h2>Flip</h2>
                                     {Array.from(
                                         new Set(
@@ -835,7 +811,7 @@ export default function Main() {
                                                     );
                                                 }}
                                             >
-                                                {"<->"}
+                                                <i className="fa-solid fa-shuffle"></i>
                                             </button>
                                         );
                                     })}
