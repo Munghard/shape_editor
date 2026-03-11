@@ -5,10 +5,10 @@ import { CreateBaseShape, CreateCircle, CreateSquare, CreateTriangle, DrawShape,
 import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, getShapeCenter, lerpVec2, screenToWorld, shapesEqual } from "../Utilities/Utilities";
 import { DrawHandleLines } from "./OverlayCanvas";
 import { DrawGrid } from "../Editor/Grid";
-import type React from "react";
+import React from "react";
 
 export class Editor {
-    canvasRef: React.RefObject<HTMLCanvasElement>;
+    canvasRef: React.RefObject<HTMLCanvasElement | null> = React.createRef();
     cameraRef: React.RefObject<Camera>;
     historyRef: React.RefObject<History>;
     lastMouseRef: React.RefObject<{ x: number; y: number } | null>;
@@ -35,7 +35,6 @@ export class Editor {
 
 
     constructor(
-        canvasRef: React.RefObject<HTMLCanvasElement>,
         cameraRef: React.RefObject<Camera>,
         historyRef: React.RefObject<History>,
         draggingRef: React.RefObject<{ index: number, handleIn: boolean } | null>,
@@ -49,7 +48,6 @@ export class Editor {
         setTick: React.Dispatch<React.SetStateAction<number>>,
 
     ) {
-        this.canvasRef = canvasRef;
         this.cameraRef = cameraRef;
         this.historyRef = historyRef;
         this.draggingRef = draggingRef;
@@ -62,7 +60,9 @@ export class Editor {
 
         this.setTick = setTick;
     }
-
+    setCanvas(canvas: HTMLCanvasElement) {
+        this.canvasRef.current = canvas;
+    }
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D) {
         this.activeTool?.onMouseDown(e, ctx, this)
         const cmp = getCanvasMousePos(e, ctx.canvas);
@@ -862,6 +862,7 @@ export class Editor {
 
     ReDrawGrid() {
         var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
+        if (!c) return;
         var ctx = c.getContext("2d") as CanvasRenderingContext2D;
         ClearCanvas(ctx);
         DrawGrid(ctx, this.gridColor, this.gridAlpha, this.gridSubdivisions, this.cameraRef.current);
