@@ -24,7 +24,7 @@ export class EditorCamera {
         this.editor.editorCamera.camera.y = 0 - h / 2;
         this.editor.editorCamera.camera.zoom = 1;
         this.editor.Draw();
-        this.editor.ReDrawGrid();
+        this.editor.editorGrid.ReDrawGrid();
     }
 
     centerCamera() {
@@ -38,6 +38,6 @@ export class EditorCamera {
         this.editor.editorCamera.camera.y = center.y - canvas.height / (2 * zoom);
 
         this.editor.Draw();
-        this.editor.ReDrawGrid();
+        this.editor.editorGrid.ReDrawGrid();
     }
 }

@@ -122,7 +122,7 @@ export default function Main() {
     // sync snaptogrid
     useEffect(() => {
         if (!editorRef.current) return;
-        editorRef.current.snapToGrid = snapToGrid;
+        editorRef.current.editorGrid.snapToGrid = snapToGrid;
     }, [snapToGrid]);
 
     // create editor
@@ -201,14 +201,14 @@ export default function Main() {
     useEffect(() => {
         if (!editorRef.current) return;
         if (showGrid) {
-            editorRef.current.ReDrawGrid();
+            editorRef.current.editorGrid.ReDrawGrid();
         }
         else {
             var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
             var ctx = c.getContext("2d") as CanvasRenderingContext2D;
             ClearGrid(ctx);
         }
-    }, [showGrid, editorRef.current?.gridSubdivisions, editorRef.current?.gridAlpha]);
+    }, [showGrid, editorRef.current?.editorGrid.gridSubdivisions, editorRef.current?.editorGrid.gridAlpha]);
 
 
     // HOTKEYS
@@ -343,7 +343,7 @@ export default function Main() {
             if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         });
 
-        if (showGrid) editorRef.current.ReDrawGrid();
+        if (showGrid) editorRef.current.editorGrid.ReDrawGrid();
         editorRef.current.Draw();
     }
 
@@ -414,7 +414,7 @@ export default function Main() {
 
     function handleSave(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         if (!editorRef.current) return;
-        SaveFile(fileName, history.present.shapes, showGrid, snapToGrid, editorRef.current.gridSubdivisions);
+        SaveFile(fileName, history.present.shapes, showGrid, snapToGrid, editorRef.current.editorGrid.gridSubdivisions);
     }
 
     function handleLoad(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
@@ -592,7 +592,8 @@ export default function Main() {
                         {editor.selectedPointIndex !== -1 &&
                             <Panel title="Selected point">
                                 <div className="flex flex-row gap-2 ">
-                                    <input className="w-[10ch]" type="number" value={editor.selectedPointIndex} onChange={editor.handleSelectPoint}></input>
+                                    var index = ;
+                                    <input className="w-[10ch]" type="number" value={editor.selectedPointIndex} onChange={(e) => editor.handleSelectPoint(Number(e.target.value))}></input>
                                     <button title="Delete point" onClick={() => editor.handleRemovePoint(editor.selectedPointIndex)}><i className="fa-solid fa-x"></i></button>
                                     <button title="Curve point" onClick={() => editor.handleAddCurveToPoint(editor.selectedPointIndex)}><i className="fa-solid fa-bezier-curve"></i></button>
                                 </div>
@@ -846,13 +847,13 @@ export default function Main() {
                             <div className="flex flex-col ">
                                 {/* this could be a component */}
                                 <div className="flex flex-row gap-2 items-center">
-                                    <input className="colorSelect" type="color" value={editor.gridColor ?? "#ffffff"} onChange={(e) => { editor.setGridColor(e.target.value); editor.setTick(t => t + 1); }} />
+                                    <input className="colorSelect" type="color" value={editor.editorGrid.gridColor ?? "#ffffff"} onChange={(e) => { editor.setGridColor(e.target.value); editor.setTick(t => t + 1); }} />
                                     <div className="flex flex-row gap-2 items-center ">
                                         <p >Alpha:</p>
-                                        <input type="number" step={0.1} min={0} max={1} value={editor.gridAlpha ?? 0.1} onChange={(e) => { editor.setGridAlpha(Number(e.target.value)); editor.setTick(t => t + 1); }}></input>
+                                        <input type="number" step={0.1} min={0} max={1} value={editor.editorGrid.gridAlpha ?? 0.1} onChange={(e) => { editor.setGridAlpha(Number(e.target.value)); editor.setTick(t => t + 1); }}></input>
                                     </div>
                                 </div>
-                                <input type="range" value={editor.gridAlpha ?? 0.1} step={0.01} min={0} max={1} onChange={(e) => { editor.setGridAlpha(Number(e.target.value)); editor.setTick(t => t + 1) }} />
+                                <input type="range" value={editor.editorGrid.gridAlpha ?? 0.1} step={0.01} min={0} max={1} onChange={(e) => { editor.setGridAlpha(Number(e.target.value)); editor.setTick(t => t + 1) }} />
                                 {/* this could be a component */}
                             </div>
                             {/* Toggle grid */}
@@ -867,8 +868,8 @@ export default function Main() {
                             </div>
                             {/* Grid subd */}
                             <div className="flex flex-col ">
-                                <label>Grid subdivision: {editor.gridSubdivisions ?? 8}</label>
-                                <input type="range" value={editor.gridSubdivisions ?? 8} min={1} max={128} onChange={(e) => { editor.setGridSubdivisions(Number(e.target.value)); editor.setTick(t => t + 1); }} />
+                                <label>Grid subdivision: {editor.editorGrid.gridSubdivisions ?? 8}</label>
+                                <input type="range" value={editor.editorGrid.gridSubdivisions ?? 8} min={1} max={128} onChange={(e) => { editor.setGridSubdivisions(Number(e.target.value)); editor.setTick(t => t + 1); }} />
                             </div>
                         </Panel>
                         <Panel title="Camera">

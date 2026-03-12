@@ -29,10 +29,11 @@ DONE
 TODO
 - [ ] Editor refactor into parts =>
 - [ ] Editor/
-- [ ] Editor.ts
+- [x] Editor.ts
 - [ ] EditorHistory.ts
 - [ ] EditorSelection.ts
 - [ ] EditorHandles.ts
+- [x] EditorGrid.ts
 - [x] EditorCamera.ts
 
 - [ ] transform for shapes, could add children to shapes and group

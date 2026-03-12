@@ -35,7 +35,7 @@ export class PanTool extends Tool {
         editor.lastMouseRef.current.y = screenY;
 
         editor.Draw()
-        editor.ReDrawGrid();
+        editor.editorGrid.ReDrawGrid();
     }
     onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>, editor: Editor): void {
         this.isDragging = false;

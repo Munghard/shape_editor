@@ -1,6 +1,7 @@
 import { APP_NAME } from "../Constants";
-import { hexToRgba } from "../Utilities/Utilities";
+import { ClearCanvas, hexToRgba } from "../Utilities/Utilities";
 import type { Camera } from "../Editor/Camera";
+import type { Editor } from "./Editor";
 
 export function ClearGrid(ctx: CanvasRenderingContext2D) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -64,4 +65,24 @@ export function DrawGrid(ctx: CanvasRenderingContext2D, color: string, alpha: nu
     ctx.lineWidth = 1 / camera.zoom; // keep line width constant on zoom
     ctx.strokeStyle = colorWithAlpha;
     ctx.stroke();
+}
+
+export class EditorGrid {
+
+    constructor(editor: Editor) {
+        this.editor = editor;
+    }
+    public editor: Editor;
+    public snapToGrid: boolean = false;
+    public gridColor: string = "#ffffff";
+    public gridAlpha: number = 0.1;
+    public gridSubdivisions: number = 8;
+
+    ReDrawGrid() {
+        var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
+        if (!c) return;
+        var ctx = c.getContext("2d") as CanvasRenderingContext2D;
+        ClearCanvas(ctx);
+        DrawGrid(ctx, this.gridColor, this.gridAlpha, this.gridSubdivisions, this.editor.editorCamera.camera);
+    }
 }

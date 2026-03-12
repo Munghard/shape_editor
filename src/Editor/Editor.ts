@@ -4,7 +4,7 @@ import type { ITool } from "../Tools/ITool";
 import { CreateBaseShape, CreateCircle, CreateSquare, CreateTriangle, DrawShape, type Path, type Point, type Shape } from "./Shape";
 import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, lerpVec2, screenToWorld, shapesEqual } from "../Utilities/Utilities";
 import { DrawHandleLines } from "./OverlayCanvas";
-import { DrawGrid } from "../Editor/Grid";
+import { EditorGrid } from "../Editor/Grid";
 import React from "react";
 
 export class Editor {
@@ -16,6 +16,7 @@ export class Editor {
     activeTool: ITool | null;
 
     editorCamera: EditorCamera = new EditorCamera(this);
+    editorGrid: EditorGrid = new EditorGrid(this);
 
     public selectedShapeIndex: number = -1;
     public selectedPathIndex: number = -1;
@@ -24,10 +25,7 @@ export class Editor {
 
     public hiddenShapeIndicies: number[] = [];
 
-    public snapToGrid: boolean = false;
-    public gridColor: string = "#ffffff";
-    public gridAlpha: number = 0.1;
-    public gridSubdivisions: number = 8;
+
 
     public setHistory: React.Dispatch<React.SetStateAction<History>>;
 
@@ -120,17 +118,17 @@ export class Editor {
     }
 
     setGridColor(color: string) {
-        this.gridColor = color;
-        this.ReDrawGrid();
+        this.editorGrid.gridColor = color;
+        this.editorGrid.ReDrawGrid();
     }
 
     setGridAlpha(alpha: number) {
-        this.gridAlpha = alpha;
-        this.ReDrawGrid();
+        this.editorGrid.gridAlpha = alpha;
+        this.editorGrid.ReDrawGrid();
     }
 
     setGridSubdivisions(gridSubdivisions: number) {
-        this.gridSubdivisions = gridSubdivisions;
+        this.editorGrid.gridSubdivisions = gridSubdivisions;
     }
 
     ClearOverlayCanvas() {
@@ -256,9 +254,8 @@ export class Editor {
         }
     }
 
-    handleSelectPoint(e: React.ChangeEvent<HTMLInputElement, HTMLInputElement>): void {
+    handleSelectPoint(index: number): void {
         const shape = this.history.present.shapes[this.selectedShapeIndex];
-        var index = Number(e.target.value);
         var points = shape.paths[this.selectedPathIndex].points.length;
         index = (index + points) % points;
         if (shape && shape.paths[this.selectedPathIndex].points.length > index && index > -1) {
@@ -296,8 +293,8 @@ export class Editor {
             let x = mouseWorldX + offsetX;
             let y = mouseWorldY + offsetY;
 
-            if (this.snapToGrid) {
-                const spacing = 1000 / this.gridSubdivisions; // same as DrawGrid
+            if (this.editorGrid.snapToGrid) {
+                const spacing = 1000 / this.editorGrid.gridSubdivisions; // same as DrawGrid
                 x = Math.round(x / spacing) * spacing;
                 y = Math.round(y / spacing) * spacing;
             }
@@ -320,7 +317,7 @@ export class Editor {
                 p.out.y += dy;
             }
             this.Draw();
-            this.ReDrawGrid();
+            this.editorGrid.ReDrawGrid();
         }
 
         const onMouseUp = () => {
@@ -361,7 +358,7 @@ export class Editor {
         this.setTick(t => t + 1); // force React to re-render knobs
 
         this.Draw();
-        this.ReDrawGrid();
+        this.editorGrid.ReDrawGrid();
 
     }
     MovePointByIndex(pointIndex: number, newPoint: Point) {
@@ -451,10 +448,10 @@ export class Editor {
             this.startDraggingPoint(this.selectedSegmentIndex + 1);
 
         } else {
-            if (this.snapToGrid) {
+            if (this.editorGrid.snapToGrid) {
                 if (!this.canvasRef.current) return;
 
-                const spacing = 1000 / this.gridSubdivisions;
+                const spacing = 1000 / this.editorGrid.gridSubdivisions;
 
                 x = Math.round(x / spacing) * spacing;
                 y = Math.round(y / spacing) * spacing;
@@ -854,13 +851,7 @@ export class Editor {
         }
     }
 
-    ReDrawGrid() {
-        var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;
-        if (!c) return;
-        var ctx = c.getContext("2d") as CanvasRenderingContext2D;
-        ClearCanvas(ctx);
-        DrawGrid(ctx, this.gridColor, this.gridAlpha, this.gridSubdivisions, this.editorCamera.camera);
-    }
+
 
     Draw() {
 
