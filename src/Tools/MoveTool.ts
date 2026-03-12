@@ -1,6 +1,6 @@
 import type { Path, Shape } from "../Editor/Shape";
 import type { Editor } from "../Editor/Editor";
-import { getCanvasMousePos } from "../Utilities/Utilities";
+import { getCanvasMousePos, MovePoint } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class MoveTool extends Tool {
@@ -36,7 +36,7 @@ export class MoveTool extends Tool {
             shapes.forEach((shape: Shape) => {
                 shape.paths.forEach(path => {
                     path.points.forEach(p => {
-                        editor.MovePoint(p, dx, dy);
+                        MovePoint(p, dx, dy);
                     });
                 });
             });
@@ -44,7 +44,7 @@ export class MoveTool extends Tool {
         else {
             shape.paths.forEach((path: Path) => {
                 path.points.forEach(p => {
-                    editor.MovePoint(p, dx, dy);
+                    MovePoint(p, dx, dy);
                 });
             });
         }

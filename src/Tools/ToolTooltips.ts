@@ -1,4 +1,4 @@
-import type { ToolEnum } from "../components/Main";
+import type { ToolEnum } from "../Editor/EditorTools";
 
 export function toolTooltip(tool: ToolEnum): string {
     switch (tool) {

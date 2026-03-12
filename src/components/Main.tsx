@@ -12,17 +12,8 @@ import { Panel } from "./Panel";
 import { PanelContainer } from "./PanelContainer";
 import { Editor } from "../Editor/Editor";
 import type { Tool } from "../Tools/Tool";
-import { SelectTool } from "../Tools/SelectTool";
-import { MoveTool } from "../Tools/MoveTool";
-import { RotateTool } from "../Tools/RotateTool";
-import { ScaleTool } from "../Tools/ScaleTool";
-import { InsertTool } from "../Tools/InsertTool";
-import { PanTool } from "../Tools/PanTool";
-import { FrameTool } from "../Tools/FrameTool";
-import { DeleteTool } from "../Tools/DeleteTool";
 import { ClearGrid } from "../Editor/Grid";
-
-export type ToolEnum = "Select" | "Move" | "Rotate" | "Scale" | "Insert" | "Delete" | "Pan" | "Frame";
+import type { ToolEnum } from "../Editor/EditorTools";
 
 
 
@@ -69,42 +60,6 @@ export default function Main() {
 
     const [toolEnum, setToolEnum] = useState<ToolEnum>("Select");
 
-    function setTool(tool: ToolEnum) {
-        setToolEnum(tool);
-        if (!editorRef.current) return;
-        switch (tool) {
-            case "Delete":
-                handleToolChange(new DeleteTool());
-                break;
-            case "Select":
-                handleToolChange(new SelectTool());
-                break;
-            case "Move":
-                handleToolChange(new MoveTool());
-                break;
-            case "Rotate":
-                handleToolChange(new RotateTool());
-                break;
-            case "Scale":
-                handleToolChange(new ScaleTool());
-                break;
-            case "Insert":
-                handleToolChange(new InsertTool());
-                break;
-            case "Pan":
-                handleToolChange(new PanTool());
-                break;
-            case "Frame":
-                handleToolChange(new FrameTool(setFrame));
-                break;
-        }
-    }
-    const handleToolChange = (tool: Tool) => {
-        if (!editorRef.current) return;
-        editorRef.current.activeTool = tool;
-        setActiveTool(tool);
-    }
-
     const [activeTool, setActiveTool] = useState<Tool | null>(null);
     const editorRef = useRef<Editor | null>(null);
 
@@ -128,12 +83,15 @@ export default function Main() {
     // create editor
     useEffect(() => {
         editorRef.current = new Editor(
-
             history,
             draggingRef,
             dragDeltaRef,
             lastMouseRef,
             activeTool,
+            setActiveTool,
+            setToolEnum,
+            setFrame,
+            frame,
             setHistory,
             setTick,
         );
@@ -155,7 +113,7 @@ export default function Main() {
                 const data = JSON.parse(saved) as { history: History; frame: Rect; tool: ToolEnum };
                 if (data.history) setHistory(data.history);
                 if (data.frame) setFrame(data.frame);
-                if (data.tool) setTool(data.tool);
+                if (data.tool) editorRef.current?.setTool(data.tool);
             } catch (error) {
                 console.warn("Failed to load session");
             }
@@ -182,7 +140,6 @@ export default function Main() {
         setRecentFiles(files);
         // console.log(files);
     }, [history]);
-
 
 
     // DRAW
@@ -231,7 +188,7 @@ export default function Main() {
                 return;
             }
             if (e.code === "Space") {
-                setTool("Pan");
+                editorRef.current.setTool("Pan");
                 e.preventDefault();
                 return;
             }
@@ -256,19 +213,19 @@ export default function Main() {
 
             // 3️⃣ Single keys
             switch (key) {
-                case "q": setTool("Select"); break;
-                case "d": setTool("Delete"); break;
-                case "f": setTool("Frame"); break;
-                case "s": setTool("Scale"); break;
-                case "r": setTool("Rotate"); break;
-                case "a": setTool("Move"); break;
-                case "w": setTool("Insert"); break;
+                case "q": editorRef.current.setTool("Select"); break;
+                case "d": editorRef.current.setTool("Delete"); break;
+                case "f": editorRef.current.setTool("Frame"); break;
+                case "s": editorRef.current.setTool("Scale"); break;
+                case "r": editorRef.current.setTool("Rotate"); break;
+                case "a": editorRef.current.setTool("Move"); break;
+                case "w": editorRef.current.setTool("Insert"); break;
             }
         }
 
         function handleKeyUp(e: globalThis.KeyboardEvent): void {
             if (e.code === "Space") {
-                setTool("Select");
+                editorRef.current?.setTool("Select");
                 e.preventDefault();
             }
         }
@@ -280,7 +237,6 @@ export default function Main() {
             window.removeEventListener("keyup", handleKeyUp);
         }
     }, [editorRef.current?.selectedShapeIndex]);
-
 
     // RESIZE CANVASES ON CHANGE
     useEffect(() => {
@@ -347,8 +303,6 @@ export default function Main() {
         editorRef.current.Draw();
     }
 
-
-
     function handleMouseMove(e: React.DragEvent<HTMLCanvasElement>) {
         if (!editorRef.current) return;
         editorRef.current.onMouseMove(e);
@@ -370,10 +324,9 @@ export default function Main() {
             knob.style.display = "flex";
             window.removeEventListener("mouseup", onMouseUp);
         }
-
         window.addEventListener("mouseup", onMouseUp);
-
     }
+
     function handleMouseDown(e: React.MouseEvent<HTMLCanvasElement>) {
         if (!canvasRef.current) return;
         if (!editorRef.current) return;
@@ -384,14 +337,9 @@ export default function Main() {
         editorRef.current.onMouseDown(e, ctx)
     }
 
-
-
     function handleMouseUp(e: React.MouseEvent<HTMLCanvasElement, MouseEvent>): void {
         if (!editorRef.current) return;
         editorRef.current.onMouseUp(e);
-        // if (editorRef.current.changeDetected()) {
-        //     editorRef.current.commit(() => history.present.shapes);
-        // }
     }
 
     function handleKnobSize(e: React.ChangeEvent<HTMLInputElement, Element>) {
@@ -407,7 +355,6 @@ export default function Main() {
 
         const ctx = tempCanvas.getContext("2d");
         if (!ctx) return;
-
 
         ExportShape(selectedExportScale, fileName, history.present.shapes, frame);
     }
@@ -430,14 +377,14 @@ export default function Main() {
             <div className="flex flex-row justify-between h-screen ">
                 <PanelContainer title="TOOLS" left={true}>
 
-                    <button className={`${toolEnum === "Select" ? "selected" : ""} `} onClick={() => setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
-                    <button className={`${toolEnum === "Insert" ? "selected" : ""} `} onClick={() => setTool("Insert")} title="Insert(W)"><i className="fa-solid fa-pencil"></i></button>
-                    <button className={`${toolEnum === "Move" ? "selected" : ""} `} onClick={() => setTool("Move")} title="Move(A)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
-                    <button className={`${toolEnum === "Rotate" ? "selected" : ""} `} onClick={() => setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
-                    <button className={`${toolEnum === "Scale" ? "selected" : ""} `} onClick={() => setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-                    <button className={`${toolEnum === "Delete" ? "selected" : ""} `} onClick={() => setTool("Delete")} title="Delete(D)"><i className="fa-solid fa-eraser"></i></button>
-                    <button className={`${toolEnum === "Pan" ? "selected" : ""} `} onClick={() => setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
-                    <button className={`${toolEnum === "Frame" ? "selected" : ""} `} onClick={() => setTool("Frame")} title="Frame(F)"><i className="fa-solid fa-crop-simple"></i></button>
+                    <button className={`${toolEnum === "Select" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Select")} title="Select(Q)"><i className="fa-solid fa-arrow-pointer"></i></button>
+                    <button className={`${toolEnum === "Insert" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Insert")} title="Insert(W)"><i className="fa-solid fa-pencil"></i></button>
+                    <button className={`${toolEnum === "Move" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Move")} title="Move(A)"><i className="fa-solid fa-arrows-up-down-left-right"></i></button>
+                    <button className={`${toolEnum === "Rotate" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Rotate")} title="Rotate(R)"><i className="fa-solid fa-rotate"></i></button>
+                    <button className={`${toolEnum === "Scale" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Scale")} title="Scale(S)"><i className="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+                    <button className={`${toolEnum === "Delete" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Delete")} title="Delete(D)"><i className="fa-solid fa-eraser"></i></button>
+                    <button className={`${toolEnum === "Pan" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Pan")} title="Pan(Space)"><i className="fa-solid fa-hand"></i></button>
+                    <button className={`${toolEnum === "Frame" ? "selected" : ""} `} onClick={() => editorRef.current?.setTool("Frame")} title="Frame(F)"><i className="fa-solid fa-crop-simple"></i></button>
 
                 </PanelContainer>
                 {/* shaped and paths */}
@@ -651,10 +598,10 @@ export default function Main() {
                                 <button onClick={(_e) => editor.AddNewShape("", CloneShape(editor.shape))}>Duplicate</button>
                                 <div className="flex flex-row gap-2">
                                     <p>Order:</p>
-                                    <button onClick={editor.moveForward}><i className="fa fa-arrow-up"></i></button>
-                                    <button onClick={editor.moveBackward}><i className="fa fa-arrow-down"></i></button>
+                                    <button onClick={editor.moveShapeForwardZ}><i className="fa fa-arrow-up"></i></button>
+                                    <button onClick={editor.moveShapeBackwardZ}><i className="fa fa-arrow-down"></i></button>
                                     {history.present.shapes.length > 0 && editor.selectedShapeIndex !== -1 &&
-                                        <button title="Delete shape" onClick={editor.DeleteSelectedShape}><i className="fa fa-circle-minus"></i></button>
+                                        <button title="Delete shape" onClick={() => editor.DeleteShape(editor.selectedShapeIndex)}><i className="fa fa-circle-minus"></i></button>
                                     }
                                 </div>
                             </Panel>
@@ -667,7 +614,7 @@ export default function Main() {
                                 </p>
                                 <div className="flex flex-row gap-2">
                                     <button title="Add path" onClick={editor.AddNewPath}><i className="fa fa-circle-plus"></i></button>
-                                    <button title="Delete path" onClick={editor.DeleteSelectedPath}><i className="fa fa-circle-minus"></i></button>
+                                    <button title="Delete path" onClick={() => editor.DeletePath(editor.selectedShapeIndex, editor.selectedPathIndex)}><i className="fa fa-circle-minus"></i></button>
                                 </div>
                                 {/* Line color */}
 

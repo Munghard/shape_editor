@@ -1,4 +1,4 @@
-import { getShapeCenter } from "../Utilities/Utilities";
+import { getCanvasMousePos, getShapeCenter } from "../Utilities/Utilities";
 import type { Editor } from "./Editor";
 
 export type Camera = {
@@ -14,6 +14,38 @@ export class EditorCamera {
     }
 
     camera: Camera = { x: 0, y: 0, zoom: 1 };
+
+
+    zoomInOut = (e: React.WheelEvent): void => {
+        if (!this.editor.canvasRef.current) return;
+
+        var cmp = getCanvasMousePos(e, this.editor.canvasRef.current)
+
+        const canvasX = cmp.x;
+        const canvasY = cmp.y;
+
+        const cam = this.editor.editorCamera.camera;
+
+        // mouse position in world coordinates
+        const worldX = cam.x + canvasX / cam.zoom;
+        const worldY = cam.y + canvasY / cam.zoom;
+
+        const zoomFactor = 1.2;
+        const delta = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
+
+        // apply zoom
+        cam.zoom *= delta;
+        cam.zoom = Math.max(0.1, Math.min(cam.zoom, 10));
+
+        // adjust camera so the world point under the mouse stays fixed
+        cam.x = worldX - (canvasX / cam.zoom);
+        cam.y = worldY - (canvasY / cam.zoom);
+
+        this.editor.setTick(t => t + 1); // force React to re-render knobs
+
+        this.editor.Draw();
+        this.editor.editorGrid.ReDrawGrid();
+    }
 
     resetCamera() {
         const canvas = this.editor.canvasRef.current;

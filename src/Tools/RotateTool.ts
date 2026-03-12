@@ -1,6 +1,6 @@
 import type { Path, Shape } from "../Editor/Shape";
 import type { Editor } from "../Editor/Editor";
-import { getCanvasMousePos, getShapeCenter } from "../Utilities/Utilities";
+import { getCanvasMousePos, getShapeCenter, RotatePoint } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class RotateTool extends Tool {
@@ -43,7 +43,7 @@ export class RotateTool extends Tool {
             shapes.forEach((shape: Shape) => {
                 shape.paths.forEach(path => {
                     path.points.forEach(p => {
-                        editor.RotatePoint(p, center, cos, sin);
+                        RotatePoint(p, center, cos, sin);
                     });
                 });
             });
@@ -51,7 +51,7 @@ export class RotateTool extends Tool {
         else {
             shape.paths.forEach((path: Path) => {
                 path.points.forEach(p => {
-                    editor.RotatePoint(p, center, cos, sin);
+                    RotatePoint(p, center, cos, sin);
                 });
             });
         }

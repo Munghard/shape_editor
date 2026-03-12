@@ -1,12 +1,14 @@
-import { EditorCamera } from "./Camera"
+import React from "react";
 import type { History } from "../Editor/History"
 import type { ITool } from "../Tools/ITool";
-import { CreateBaseShape, CreateCircle, CreateSquare, CreateTriangle, DrawShape, type Path, type Point, type Shape } from "./Shape";
-import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, lerpVec2, screenToWorld, shapesEqual } from "../Utilities/Utilities";
+import { EditorCamera } from "./Camera"
+import { DrawShape, type Path, type Point, type Rect, type Shape } from "./Shape";
+import { buildPath, ClearCanvas, getCanvasMousePos, screenToWorld, shapesEqual } from "../Utilities/Utilities";
 import { DrawHandleLines } from "./OverlayCanvas";
 import { EditorGrid } from "../Editor/Grid";
-import React from "react";
 import { EditorHistory } from "./EditorHistory";
+import { EditorTools, type ToolEnum } from "./EditorTools";
+import type { Tool } from "../Tools/Tool";
 
 export class Editor {
     canvasRef: React.RefObject<HTMLCanvasElement | null> = React.createRef();
@@ -18,6 +20,8 @@ export class Editor {
 
     editorCamera: EditorCamera = new EditorCamera(this);
     editorGrid: EditorGrid = new EditorGrid(this);
+    editorTools: EditorTools;
+
     editorHistory: EditorHistory;
 
     public selectedShapeIndex: number = -1;
@@ -27,10 +31,7 @@ export class Editor {
 
     public hiddenShapeIndicies: number[] = [];
 
-
     public setTick: React.Dispatch<React.SetStateAction<number>>;
-
-
 
     constructor(
         history: History,
@@ -39,25 +40,31 @@ export class Editor {
         lastMouseRef: React.RefObject<{ x: number, y: number } | null>,
 
         activeTool: ITool | null,
+        setActiveTool: React.Dispatch<React.SetStateAction<Tool | null>>,
+
+        setToolEnum: React.Dispatch<React.SetStateAction<ToolEnum>>,
+        setFrame: React.Dispatch<React.SetStateAction<Rect>>,
+
+        frame: Rect,
 
         setHistory: React.Dispatch<React.SetStateAction<History>>,
-
         setTick: React.Dispatch<React.SetStateAction<number>>,
-
     ) {
         this.editorHistory = new EditorHistory(this, history, setHistory);
+        this.editorTools = new EditorTools(this, frame, setFrame, setToolEnum, setActiveTool);
         this.draggingRef = draggingRef;
         this.dragDeltaRef = dragDeltaRef;
         this.lastMouseRef = lastMouseRef;
 
         this.activeTool = activeTool;
 
-
         this.setTick = setTick;
     }
+
     setCanvas(canvas: HTMLCanvasElement) {
         this.canvasRef.current = canvas;
     }
+
     onMouseDown(e: React.MouseEvent<HTMLCanvasElement>, ctx: CanvasRenderingContext2D) {
         if (this.changeDetected()) {
             this.commit(prev => prev); // commit before change
@@ -75,6 +82,7 @@ export class Editor {
     onMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
         this.activeTool?.onMouseUp(e, this)
     }
+
     onMouseDownKnob(e: React.MouseEvent<HTMLDivElement>, index: number) {
         this.activeTool?.onMouseDownKnob(e, this, index)
     }
@@ -103,9 +111,11 @@ export class Editor {
     get shape(): Shape {
         return this.history.present.shapes[this.selectedShapeIndex];
     }
+
     get path(): Path {
         return this.history.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex];
     }
+
     get point(): Point {
         return this.history.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
     }
@@ -114,18 +124,22 @@ export class Editor {
         this.selectedShapeIndex = index;
         this.setTick(t => t + 1);
     }
+
     setSelectedPathIndex(index: number) {
         this.selectedPathIndex = index;
         this.setTick(t => t + 1);
     }
+
     setSelectedPointIndex(index: number) {
         this.selectedPointIndex = index;
         this.setTick(t => t + 1);
     }
+
     setSelectedSegmentIndex(index: number) {
         this.selectedSegmentIndex = index;
         this.setTick(t => t + 1);
     }
+
     setHiddenShapeIndicies(index: number[]) {
         this.hiddenShapeIndicies = index;
         this.setTick(t => t + 1);
@@ -155,130 +169,36 @@ export class Editor {
         ClearCanvas(coctx);
     }
 
+    setTool(tool: ToolEnum) {
+        this.editorTools.setTool(tool);
+    }
+
     AddNewShape(shapeName: string, shape: Shape | null = null): Shape {
-
-        let newShape: Shape = CreateBaseShape();
-        if (shape === null) {
-
-            if (shapeName === "empty") {
-                newShape = CreateBaseShape();
-            }
-            if (shapeName === "circle") {
-                newShape = CreateBaseShape([CreateCircle()]);
-            }
-            if (shapeName === "square") {
-                newShape = CreateBaseShape([CreateSquare()]);
-            }
-            if (shapeName === "triangle") {
-                newShape = CreateBaseShape([CreateTriangle()]);
-            }
-        }
-        else {
-            newShape = shape;
-
-            // this was to add an offset to the duplicated shape but its adding it to the main shape too and i cant be arsed right now
-            // const offset = { x: 50, y: 50 };
-            // newShape.paths.forEach(pa => pa.points.forEach(po => { po.x += offset.x; po.y += offset.y; }));
-        }
-
-        newShape = CloneShape(newShape);
-
-        const newIndex = this.history.present.shapes.length;
-
-        this.commit(prev => [...prev, newShape]);
-
-        this.setSelectedShapeIndex(newIndex);
-        this.setSelectedPathIndex(0);
-        return newShape;
+        return this.editorHistory.AddNewShape(shapeName, shape);
     }
 
-    DeleteSelectedShape(): void {
-        if (this.selectedShapeIndex === -1) return;
-        const shape = this.history.present.shapes[this.selectedShapeIndex];
-        this.commit(prev => [...prev.filter(s => s !== shape)]);
-        this.setSelectedShapeIndex(Math.max(this.selectedShapeIndex - 1, 0));
-        this.setSelectedSegmentIndex(0);
-    }
     DeleteShape(index: number): void {
-        if (index === -1) return;
-        this.commit(prev => [...prev.filter((_s, i) => i !== index)]);
-        this.setSelectedShapeIndex(-1);
-        this.setSelectedSegmentIndex(0);
+        this.editorHistory.DeleteShape(index);
     }
 
-    // update shape helper
     updateSelectedShape(updater: (shape: Shape) => Shape) {
-        this.commit(prev =>
-            prev.map((s, i) => (i === this.selectedShapeIndex ? updater(s) : s))
-        );
+        this.editorHistory.updateSelectedShape(updater);
     }
-    // function updateShape(index: number, updater: (shape: Shape) => Shape) {
-    //     commit(prev =>
-    //         prev.map((s, i) => (i === index ? updater(s) : s))
-    //     );
-    // }
-
 
     AddNewPath(): void {
-        if (this.history.present.shapes.length < 1) return;
-        this.commit(prev =>
-            prev.map((s, i) => {
-                if (i !== this.selectedShapeIndex) return s;
-
-                const newPaths = [
-                    ...s.paths,
-                    { points: [], isHole: true }
-                ];
-                return { ...s, paths: newPaths }
-            })
-
-        );
-        this.setSelectedPathIndex(this.history.present.shapes[this.selectedShapeIndex].paths.length);
+        this.editorHistory.AddNewPath();
     }
-    DeleteSelectedPath(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>): void {
-        this.commit(prev =>
-            prev.map((s, i) => {
-                if (i !== this.selectedShapeIndex) return s;
 
-                const newPaths = [
-                    ...s.paths.filter((_p, i) => i !== this.selectedPathIndex)
-                ];
-                return { ...s, paths: newPaths }
-            })
-        );
-        this.setSelectedPathIndex(Math.max(this.selectedPathIndex - 1, 0));
-    }
     DeletePath(shapeIndex: number, pathIndex: number): void {
-        this.commit(prev =>
-            prev.map((s, i) => {
-                if (i !== shapeIndex) return s;
-
-                const newPaths = [
-                    ...s.paths.filter((_p, i) => i !== pathIndex)
-                ];
-                return { ...s, paths: newPaths }
-            })
-        );
-        this.setSelectedPathIndex(Math.max(this.selectedPathIndex - 1, 0));
+        this.editorHistory.DeletePath(shapeIndex, pathIndex);
     }
+
     HideShape(i: number, hide: boolean): void {
         if (hide) {
-
             this.setHiddenShapeIndicies([...this.hiddenShapeIndicies, i]);
         }
         else {
-
             this.setHiddenShapeIndicies(this.hiddenShapeIndicies.filter(p => p !== i));
-        }
-    }
-
-    handleSelectPoint(index: number): void {
-        const shape = this.history.present.shapes[this.selectedShapeIndex];
-        var points = shape.paths[this.selectedPathIndex].points.length;
-        index = (index + points) % points;
-        if (shape && shape.paths[this.selectedPathIndex].points.length > index && index > -1) {
-
-            this.setSelectedPointIndex(index)
         }
     }
 
@@ -349,177 +269,21 @@ export class Editor {
     }
 
     handleScroll = (e: React.WheelEvent): void => {
-        if (!this.canvasRef.current) return;
-
-        var cmp = getCanvasMousePos(e, this.canvasRef.current)
-
-        const canvasX = cmp.x;
-        const canvasY = cmp.y;
-
-        const cam = this.editorCamera.camera;
-
-        // mouse position in world coordinates
-        const worldX = cam.x + canvasX / cam.zoom;
-        const worldY = cam.y + canvasY / cam.zoom;
-
-        const zoomFactor = 1.2;
-        const delta = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
-
-        // apply zoom
-        cam.zoom *= delta;
-        cam.zoom = Math.max(0.1, Math.min(cam.zoom, 10));
-
-        // adjust camera so the world point under the mouse stays fixed
-        cam.x = worldX - (canvasX / cam.zoom);
-        cam.y = worldY - (canvasY / cam.zoom);
-
-        this.setTick(t => t + 1); // force React to re-render knobs
-
-        this.Draw();
-        this.editorGrid.ReDrawGrid();
-
+        this.editorCamera.zoomInOut(e);
     }
+
     MovePointByIndex(pointIndex: number, newPoint: Point) {
-
-        if (this.changeDetected()) {
-
-
-            this.commit(prevShapes =>
-                prevShapes.map((shape, i) => {
-                    if (i !== this.selectedShapeIndex) return shape;
-
-                    // copy all paths
-                    const newPaths = shape.paths.map((path, pi) => {
-                        if (pi !== this.selectedPathIndex) return path;
-
-                        // copy points, replacing the moved point
-                        const newPoints = path.points.map((pt, pj) =>
-                            pj === pointIndex ? { x: newPoint.x, y: newPoint.y } : { ...pt }
-                        );
-
-                        return { ...path, points: newPoints };
-                    });
-
-                    return { ...shape, paths: newPaths };
-                })
-            );
-        }
-
-        this.setSelectedPointIndex(pointIndex);
+        this.editorHistory.MovePointByIndex(pointIndex, newPoint);
     }
 
     handleCreatePoint(e: React.MouseEvent<HTMLCanvasElement>, targetIndex: number) {
-        if (!this.canvasRef.current) return;
-        if (this.selectedPathIndex === -1) return;
-        let shapeIndex = targetIndex;
-        let pathIndex = this.selectedPathIndex;
-        let shape = this.history.present.shapes[shapeIndex];
-
-        // if no shape exists, create one
-        if (!shape) {
-            const newShape = CreateBaseShape();
-
-
-            this.commit(prev => {
-                const newShapes = [...prev, newShape];
-                // update selection immediately for next render
-                this.setSelectedShapeIndex(newShapes.length - 1);
-                this.setSelectedPathIndex(0);
-
-                // update local variables for this function
-                shape = newShape;
-                shapeIndex = newShapes.length - 1;
-                pathIndex = 0;
-
-                return newShapes;
-            });
-        }
-
-        const path = shape.paths[pathIndex];
-        if (!path) return;
-
-        const cam = this.editorCamera.camera;
-
-        var cmp = getCanvasMousePos(e, this.canvasRef.current)
-
-        const canvasX = cmp.x;
-        const canvasY = cmp.y;
-
-        let x = canvasX / cam.zoom + cam.x;
-        let y = canvasY / cam.zoom + cam.y;
-
-        let newPoint: Point;
-
-        if (this.selectedSegmentIndex !== -1) {
-            const n = path.points.length;
-            const start = path.points[this.selectedSegmentIndex];
-            const end = path.points[(this.selectedSegmentIndex + 1) % n];
-
-            const c1 = start.out ?? start; // fallback if null
-            const c2 = end.in ?? end;
-
-            // get midpoint along cubic Bezier
-            newPoint = cubicBezierPoint(0.5, start, c1, c2, end);
-
-            this.insertPointAt(this.selectedSegmentIndex, newPoint.x, newPoint.y);
-            this.setSelectedPointIndex(this.selectedSegmentIndex + 1);
-            this.startDraggingPoint(this.selectedSegmentIndex + 1);
-
-        } else {
-            if (this.editorGrid.snapToGrid) {
-                if (!this.canvasRef.current) return;
-
-                const spacing = 1000 / this.editorGrid.gridSubdivisions;
-
-                x = Math.round(x / spacing) * spacing;
-                y = Math.round(y / spacing) * spacing;
-            }
-
-            newPoint = { x, y };
-
-
-            this.commit(prev =>
-                prev.map((s, i) => {
-                    if (i !== shapeIndex) return s;
-
-                    const newPaths = [...s.paths];
-                    const currentPath = newPaths[pathIndex];
-                    const newPoints = [...currentPath.points, newPoint];
-
-                    newPaths[pathIndex] = { ...currentPath, points: newPoints };
-                    return { ...s, paths: newPaths };
-                })
-            );
-
-            const newIndex = path.points.length;
-            this.setSelectedPointIndex(newIndex);
-            this.startDraggingPoint(newIndex);
-        }
+        this.editorHistory.handleCreatePoint(e, targetIndex);
     }
 
     insertPointAt(index: number, x: number, y: number) {
-        const newPoint = { x, y };
-
-
-        this.commit(prev =>
-            prev.map((s, i) => {
-                if (i !== this.selectedShapeIndex) return s;
-
-                const newPaths = [...s.paths];
-                const currentPath = newPaths[this.selectedPathIndex];
-
-                const newPoints = [...currentPath.points];
-                newPoints.splice(index + 1, 0, newPoint);
-
-                newPaths[this.selectedPathIndex] = {
-                    ...currentPath,
-                    points: newPoints
-                };
-
-                return { ...s, paths: newPaths };
-            })
-        );
+        this.editorHistory.insertPointAt(index, x, y);
     }
+
     // ================================================================================================================
     // HANDLES
     // ================================================================================================================
@@ -632,105 +396,25 @@ export class Editor {
 
         return !shapesEqual(current, lastPast);
     }
+
     handleAddCurveToPoint(index: number) {
-        this.commit(prevShapes =>
-            prevShapes.map((s, i) => {
-                if (i !== this.selectedShapeIndex) return s;
-
-                const newPaths = [...s.paths];
-                const currentPath = { ...newPaths[this.selectedPathIndex] };
-
-                const newPoints = [...currentPath.points];
-                const p = { ...newPoints[index] };
-
-                const count = newPoints.length;
-
-                const prevIndex = (index - 1 + count) % count;
-                const nextIndex = (index + 1) % count;
-
-                const prev = { ...newPoints[prevIndex] };
-                const next = { ...newPoints[nextIndex] };
-
-                const newP = lerpVec2(p, prev, 0.5);
-                const newN = lerpVec2(p, next, 0.5);
-
-                p.in = { x: newP.x, y: newP.y };
-                p.out = { x: newN.x, y: newN.y };
-
-                newPoints[index] = p;
-                currentPath.points = newPoints;
-
-                newPaths[this.selectedPathIndex] = currentPath;
-
-                return { ...s, paths: newPaths };
-            })
-        );
+        this.editorHistory.handleAddCurveToPoint(index);
     }
+
     handleRemovePoint(index: number) {
-
-        this.commit(prevShapes =>
-            prevShapes.map((s, i) => {
-                if (i !== this.selectedShapeIndex) return s;
-
-                const newPaths = [...s.paths];
-                const currentPath = { ...newPaths[this.selectedPathIndex] };
-
-                currentPath.points = currentPath.points.filter(
-                    (_p, idx) => idx !== index
-                );
-
-                newPaths[this.selectedPathIndex] = currentPath;
-
-                return { ...s, paths: newPaths };
-            })
-        );
-
-        if (this.selectedPointIndex === null) {
-            this.selectedPointIndex = 0;
-        } else if (this.selectedPointIndex === index) {
-            this.selectedPointIndex = 0;
-        } else if (this.selectedPointIndex > index) {
-            this.selectedPointIndex -= 1;
-        }
-        // else leave it as-is
+        this.editorHistory.handleRemovePoint(index);
     }
 
-    moveForward() {
-        this.commit(prev => {
-            const index = this.selectedShapeIndex;
-            if (index === -1 || index >= prev.length - 1) return prev;
-
-            const copy = [...prev];
-            [copy[index], copy[index + 1]] =
-                [copy[index + 1], copy[index]];
-
-            this.setSelectedShapeIndex(index + 1);
-            return copy;
-        });
-    }
-    moveBackward() {
-        this.commit(prev => {
-            const index = this.selectedShapeIndex;
-            if (index <= 0) return prev;
-
-            const copy = [...prev];
-            [copy[index], copy[index - 1]] =
-                [copy[index - 1], copy[index]];
-
-            this.setSelectedShapeIndex(index - 1);
-            return copy;
-        });
+    moveShapeForwardZ() {
+        this.editorHistory.moveShapeForwardZ();
     }
 
-    // type Commit = (updater: (prev: Shape[]) => Shape[]) => void;
-
+    moveShapeBackwardZ() {
+        this.editorHistory.moveShapeBackwardZ
+    }
 
     setShapeName(name: string, index: number): void {
-        this.commit(prev =>
-            prev.map((p, i) =>
-                i === index ? { ...p, name } : p
-            )
-        );
+        this.editorHistory.setShapeName(name, index);
     }
 
     clearDocument(): void {
@@ -742,6 +426,15 @@ export class Editor {
         if (this.canvasRef.current) ClearCanvas(this.canvasRef.current.getContext("2d")!);
     }
 
+    handleSelectPoint(index: number): void {
+        const shape = this.history.present.shapes[this.selectedShapeIndex];
+        var points = shape.paths[this.selectedPathIndex].points.length;
+        index = (index + points) % points;
+        if (shape && shape.paths[this.selectedPathIndex].points.length > index && index > -1) {
+            this.setSelectedPointIndex(index)
+        }
+    }
+
     selectShapeAt(ctx: CanvasRenderingContext2D, x: number, y: number) {
         let foundShapeIndex = -1;
         let nextPathIndex = -1;
@@ -749,7 +442,7 @@ export class Editor {
         // loop from top-most shape down
         for (let i = this.history.present.shapes.length - 1; i >= 0; i--) {
             const shape = this.history.present.shapes[i];
-            this.buildPath(ctx, shape);
+            buildPath(ctx, shape);
 
             if (ctx.isPointInPath(x, y)) {
                 foundShapeIndex = i;
@@ -765,55 +458,13 @@ export class Editor {
                 break;
             }
         }
-
         // update state **once**, after selection is determined
         this.setSelectedShapeIndex(foundShapeIndex);
         this.setSelectedPathIndex(nextPathIndex);
         this.setSelectedPointIndex(-1);
     }
 
-    buildPath(ctx: CanvasRenderingContext2D, shape: Shape) {
-        ctx.beginPath();
-        for (let index = 0; index < shape.paths.length; index++) {
-
-            const points = shape.paths[index].points;
-
-            if (!points || points.length === 0) continue;
-
-            ctx.moveTo(points[0].x, points[0].y);
-
-            for (let i = 1; i < points.length; i++) {
-                const prev = points[i - 1];
-                const curr = points[i];
-                ctx.bezierCurveTo(
-                    prev.out?.x ?? prev.x,
-                    prev.out?.y ?? prev.y,
-                    curr.in?.x ?? curr.x,
-                    curr.in?.y ?? curr.y,
-                    curr.x, curr.y
-                );
-            }
-            if (shape.cyclic && points.length > 1) {
-                const last = points[points.length - 1];
-                const first = points[0];
-
-                ctx.bezierCurveTo(
-                    last.out?.x ?? last.x,
-                    last.out?.y ?? last.y,
-                    first.in?.x ?? first.x,
-                    first.in?.y ?? first.y,
-                    first.x,
-                    first.y
-                );
-                ctx.closePath(); // optional for closed shapes
-            }
-        }
-    }
-
-
-
     Draw() {
-
         const canvas = this.canvasRef.current;
         if (!canvas) return;
 
@@ -846,76 +497,6 @@ export class Editor {
         }
         else {
             ClearCanvas(coctx);
-        }
-    }
-    // ================================================================================================================
-    // MOVE
-    // ================================================================================================================
-
-    MovePoint(p: Point, dx: number, dy: number) {
-        p.x += dx;
-        p.y += dy;
-
-        if (p.in) {
-            p.in.x += dx;
-            p.in.y += dy;
-        }
-
-        if (p.out) {
-            p.out.x += dx;
-            p.out.y += dy;
-        }
-    }
-    // ================================================================================================================
-    // ROTATE
-    // ================================================================================================================
-    RotatePoint(p: Point, center: { x: number; y: number; }, cos: number, sin: number) {
-        const offsetX = p.x - center.x;
-        const offsetY = p.y - center.y;
-
-        // apply rotation
-        const rotatedX = offsetX * cos - offsetY * sin;
-        const rotatedY = offsetX * sin + offsetY * cos;
-
-        p.x = center.x + rotatedX;
-        p.y = center.y + rotatedY;
-
-        if (p.in) {
-            const inOffsetX = p.in.x - center.x;
-            const inOffsetY = p.in.y - center.y;
-
-            // apply rotation
-            const rotatedInX = inOffsetX * cos - inOffsetY * sin;
-            const rotatedInY = inOffsetX * sin + inOffsetY * cos;
-
-            p.in.x = center.x + rotatedInX;
-            p.in.y = center.y + rotatedInY;
-        }
-        if (p.out) {
-            const outOffsetX = p.out.x - center.x;
-            const outOffsetY = p.out.y - center.y;
-
-            // apply rotation
-            const rotatedOutX = outOffsetX * cos - outOffsetY * sin;
-            const rotatedOutY = outOffsetX * sin + outOffsetY * cos;
-
-            p.out.x = center.x + rotatedOutX;
-            p.out.y = center.y + rotatedOutY;
-        }
-    }
-    // ================================================================================================================
-    // SCALE
-    // ================================================================================================================
-    ScalePoint(p: Point, center: { x: number; y: number }, scaleFactor: number) {
-        p.x = center.x + (p.x - center.x) * scaleFactor;
-        p.y = center.y + (p.y - center.y) * scaleFactor;
-        if (p.in) {
-            p.in.x = center.x + (p.in.x - center.x) * scaleFactor;
-            p.in.y = center.y + (p.in.y - center.y) * scaleFactor;
-        }
-        if (p.out) {
-            p.out.x = center.x + (p.out.x - center.x) * scaleFactor;
-            p.out.y = center.y + (p.out.y - center.y) * scaleFactor;
         }
     }
 }

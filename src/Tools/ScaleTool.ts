@@ -1,6 +1,6 @@
 import type { Path, Shape } from "../Editor/Shape";
 import type { Editor } from "../Editor/Editor";
-import { getCanvasMousePos, getShapeCenter } from "../Utilities/Utilities";
+import { getCanvasMousePos, getShapeCenter, ScalePoint } from "../Utilities/Utilities";
 import { Tool } from "./Tool";
 
 export class ScaleTool extends Tool {
@@ -39,7 +39,7 @@ export class ScaleTool extends Tool {
             shapes.forEach((shape: Shape) => {
                 shape.paths.forEach(path => {
                     path.points.forEach(p => {
-                        editor.ScalePoint(p, center, scaleFactor);
+                        ScalePoint(p, center, scaleFactor);
                     });
                 });
             });
@@ -48,7 +48,7 @@ export class ScaleTool extends Tool {
 
             shape.paths.forEach((path: Path) => {
                 path.points.forEach(p => {
-                    editor.ScalePoint(p, center, scaleFactor);
+                    ScalePoint(p, center, scaleFactor);
                 });
             });
         }

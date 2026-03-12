@@ -80,6 +80,7 @@ export function getShapeCenter(shape: Shape) {
         y: (minY + maxY) / 2
     };
 }
+
 export function getCanvasMousePos(e: MouseEvent | React.MouseEvent, canvas: HTMLCanvasElement) {
     const rect = canvas.getBoundingClientRect();
     return {
@@ -87,6 +88,45 @@ export function getCanvasMousePos(e: MouseEvent | React.MouseEvent, canvas: HTML
         y: ((e.clientY - rect.top) / rect.height) * canvas.height
     };
 }
+
+export function buildPath(ctx: CanvasRenderingContext2D, shape: Shape) {
+    ctx.beginPath();
+    for (let index = 0; index < shape.paths.length; index++) {
+
+        const points = shape.paths[index].points;
+
+        if (!points || points.length === 0) continue;
+
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 1; i < points.length; i++) {
+            const prev = points[i - 1];
+            const curr = points[i];
+            ctx.bezierCurveTo(
+                prev.out?.x ?? prev.x,
+                prev.out?.y ?? prev.y,
+                curr.in?.x ?? curr.x,
+                curr.in?.y ?? curr.y,
+                curr.x, curr.y
+            );
+        }
+        if (shape.cyclic && points.length > 1) {
+            const last = points[points.length - 1];
+            const first = points[0];
+
+            ctx.bezierCurveTo(
+                last.out?.x ?? last.x,
+                last.out?.y ?? last.y,
+                first.in?.x ?? first.x,
+                first.in?.y ?? first.y,
+                first.x,
+                first.y
+            );
+            ctx.closePath(); // optional for closed shapes
+        }
+    }
+}
+
 export function CloneShape(shape: Shape): Shape {
     return {
         ...shape,
@@ -113,4 +153,74 @@ export function clonePath(path: Path): Path {
         ...path,
         points: path.points.map(pt => ({ ...pt }))
     };
+}
+// ================================================================================================================
+// MOVE
+// ================================================================================================================
+
+export function MovePoint(p: Point, dx: number, dy: number) {
+    p.x += dx;
+    p.y += dy;
+
+    if (p.in) {
+        p.in.x += dx;
+        p.in.y += dy;
+    }
+
+    if (p.out) {
+        p.out.x += dx;
+        p.out.y += dy;
+    }
+}
+// ================================================================================================================
+// ROTATE
+// ================================================================================================================
+export function RotatePoint(p: Point, center: { x: number; y: number; }, cos: number, sin: number) {
+    const offsetX = p.x - center.x;
+    const offsetY = p.y - center.y;
+
+    // apply rotation
+    const rotatedX = offsetX * cos - offsetY * sin;
+    const rotatedY = offsetX * sin + offsetY * cos;
+
+    p.x = center.x + rotatedX;
+    p.y = center.y + rotatedY;
+
+    if (p.in) {
+        const inOffsetX = p.in.x - center.x;
+        const inOffsetY = p.in.y - center.y;
+
+        // apply rotation
+        const rotatedInX = inOffsetX * cos - inOffsetY * sin;
+        const rotatedInY = inOffsetX * sin + inOffsetY * cos;
+
+        p.in.x = center.x + rotatedInX;
+        p.in.y = center.y + rotatedInY;
+    }
+    if (p.out) {
+        const outOffsetX = p.out.x - center.x;
+        const outOffsetY = p.out.y - center.y;
+
+        // apply rotation
+        const rotatedOutX = outOffsetX * cos - outOffsetY * sin;
+        const rotatedOutY = outOffsetX * sin + outOffsetY * cos;
+
+        p.out.x = center.x + rotatedOutX;
+        p.out.y = center.y + rotatedOutY;
+    }
+}
+// ================================================================================================================
+// SCALE
+// ================================================================================================================
+export function ScalePoint(p: Point, center: { x: number; y: number }, scaleFactor: number) {
+    p.x = center.x + (p.x - center.x) * scaleFactor;
+    p.y = center.y + (p.y - center.y) * scaleFactor;
+    if (p.in) {
+        p.in.x = center.x + (p.in.x - center.x) * scaleFactor;
+        p.in.y = center.y + (p.in.y - center.y) * scaleFactor;
+    }
+    if (p.out) {
+        p.out.x = center.x + (p.out.x - center.x) * scaleFactor;
+        p.out.y = center.y + (p.out.y - center.y) * scaleFactor;
+    }
 }
