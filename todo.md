@@ -30,7 +30,7 @@ TODO
 - [ ] Editor refactor into parts =>
 - [ ] Editor/
 - [x] Editor.ts
-- [ ] EditorHistory.ts
+- [x] EditorHistory.ts
 - [ ] EditorSelection.ts
 - [ ] EditorHandles.ts
 - [x] EditorGrid.ts

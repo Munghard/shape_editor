@@ -6,10 +6,11 @@ import { ClearCanvas, CloneShape, cubicBezierPoint, getCanvasMousePos, lerpVec2,
 import { DrawHandleLines } from "./OverlayCanvas";
 import { EditorGrid } from "../Editor/Grid";
 import React from "react";
+import { EditorHistory } from "./EditorHistory";
 
 export class Editor {
     canvasRef: React.RefObject<HTMLCanvasElement | null> = React.createRef();
-    history: History;
+
     lastMouseRef: React.RefObject<{ x: number; y: number } | null>;
     draggingRef: React.RefObject<{ index: number, handleIn: boolean } | null>;
     dragDeltaRef: React.RefObject<{ index: number, handleIn: boolean, dx: number, dy: number } | null>;
@@ -17,6 +18,7 @@ export class Editor {
 
     editorCamera: EditorCamera = new EditorCamera(this);
     editorGrid: EditorGrid = new EditorGrid(this);
+    editorHistory: EditorHistory;
 
     public selectedShapeIndex: number = -1;
     public selectedPathIndex: number = -1;
@@ -25,9 +27,6 @@ export class Editor {
 
     public hiddenShapeIndicies: number[] = [];
 
-
-
-    public setHistory: React.Dispatch<React.SetStateAction<History>>;
 
     public setTick: React.Dispatch<React.SetStateAction<number>>;
 
@@ -46,14 +45,13 @@ export class Editor {
         setTick: React.Dispatch<React.SetStateAction<number>>,
 
     ) {
-        this.history = history;
+        this.editorHistory = new EditorHistory(this, history, setHistory);
         this.draggingRef = draggingRef;
         this.dragDeltaRef = dragDeltaRef;
         this.lastMouseRef = lastMouseRef;
 
         this.activeTool = activeTool;
 
-        this.setHistory = setHistory;
 
         this.setTick = setTick;
     }
@@ -81,6 +79,27 @@ export class Editor {
         this.activeTool?.onMouseDownKnob(e, this, index)
     }
 
+    get history(): History {
+        return this.editorHistory.history;
+    }
+
+    set history(history: History) {
+        this.editorHistory.history = history;
+        this.editorHistory.setHistory(history);
+    }
+
+    commit(updater: (shapes: Shape[]) => Shape[]) {
+        this.editorHistory.commit(updater);
+    }
+
+    undo() {
+        this.editorHistory.undo();
+    }
+
+    redo() {
+        this.editorHistory.redo();
+    }
+
     get shape(): Shape {
         return this.history.present.shapes[this.selectedShapeIndex];
     }
@@ -90,7 +109,6 @@ export class Editor {
     get point(): Point {
         return this.history.present.shapes[this.selectedShapeIndex].paths[this.selectedPathIndex].points[this.selectedPointIndex];
     }
-
 
     setSelectedShapeIndex(index: number) {
         this.selectedShapeIndex = index;
@@ -706,65 +724,6 @@ export class Editor {
 
     // type Commit = (updater: (prev: Shape[]) => Shape[]) => void;
 
-    // ================================================================================================================
-    // HISTORY
-    // ================================================================================================================
-
-    commit(updater: (prevShapes: Shape[]) => Shape[]) {
-        this.setHistory(prev => {
-
-            return {
-                past: [...prev.past, prev.present],
-                present: {
-                    shapes: this.cloneShapes(updater(prev.present.shapes))
-                },
-                future: []
-            };
-        });
-    }
-    cloneShapes(shapes: Shape[]): Shape[] {
-        return shapes.map(s => ({
-            ...s,
-            paths: s.paths.map(p => ({
-                ...p,
-                points: p.points.map(pt => ({
-                    ...pt,
-                    in: pt.in ? { ...pt.in } : undefined,
-                    out: pt.out ? { ...pt.out } : undefined
-                }))
-            }))
-        }));
-    }
-    undo() {
-        this.setHistory(prev => {
-            if (prev.past.length === 0) return prev;
-
-            const previous = prev.past[prev.past.length - 1];
-
-            return {
-                past: prev.past.slice(0, -1),
-                present: previous,
-                future: [prev.present, ...prev.future]
-            };
-        });
-    }
-    redo() {
-        this.setHistory(prev => {
-            if (prev.future.length === 0) return prev;
-
-            const next = prev.future[0];
-
-            return {
-                past: [...prev.past, prev.present],
-                present: next,
-                future: prev.future.slice(1)
-            };
-        });
-    }
-
-    // ================================================================================================================
-    // HISTORY
-    // ================================================================================================================
 
     setShapeName(name: string, index: number): void {
         this.commit(prev =>
@@ -775,7 +734,7 @@ export class Editor {
     }
 
     clearDocument(): void {
-        this.setHistory({ past: [], present: { shapes: [] }, future: [] });
+        this.editorHistory.setHistory({ past: [], present: { shapes: [] }, future: [] });
         this.setSelectedPointIndex(-1);
         this.setSelectedPathIndex(-1);
         this.setSelectedShapeIndex(-1)
