@@ -26,15 +26,17 @@ DONE
 - [x] separate tools to its own file
 - [x] something wrong with grid rendering when you turn it off
 
-TODO
-- [ ] Editor refactor into parts =>
-- [ ] Editor/
+- [x] Editor refactor into parts =>
+- [x] Editor/
 - [x] Editor.ts
 - [x] EditorHistory.ts
-- [ ] EditorSelection.ts
-- [ ] EditorHandles.ts
+- [x] EditorTools.ts
+- [x] EditorSelection.ts
+- [x] EditorHandles.ts
 - [x] EditorGrid.ts
 - [x] EditorCamera.ts
+
+TODO
 
 - [ ] transform for shapes, could add children to shapes and group
 - [ ] add quadratic curve button and (only in or out on point)
