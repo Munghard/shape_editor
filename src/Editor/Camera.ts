@@ -42,7 +42,6 @@ export class EditorCamera {
         cam.y = worldY - (canvasY / cam.zoom);
 
         this.editor.setTick(t => t + 1); // force React to re-render knobs
-
         this.editor.Draw();
         this.editor.editorGrid.ReDrawGrid();
     }
@@ -55,8 +54,10 @@ export class EditorCamera {
         this.editor.editorCamera.camera.x = 0 - w / 2;
         this.editor.editorCamera.camera.y = 0 - h / 2;
         this.editor.editorCamera.camera.zoom = 1;
+
         this.editor.Draw();
         this.editor.editorGrid.ReDrawGrid();
+        this.editor.setTick(t => t + 1);
     }
 
     centerCamera() {
@@ -69,6 +70,7 @@ export class EditorCamera {
         this.editor.editorCamera.camera.x = center.x - canvas.width / (2 * zoom);
         this.editor.editorCamera.camera.y = center.y - canvas.height / (2 * zoom);
 
+        this.editor.setTick(t => t + 1);
         this.editor.Draw();
         this.editor.editorGrid.ReDrawGrid();
     }

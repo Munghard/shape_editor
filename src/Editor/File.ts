@@ -49,7 +49,7 @@ export function ExportShape(
     link.download = `${fileName}.png`;
     link.click();
 }
-export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, snapGrid: boolean, gridSubd: number): void {
+export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, snapGrid: boolean, gridSubd: number, frameRect: Rect): void {
     const saveData: SaveData = {
         id: crypto.randomUUID(),
         fileName,
@@ -57,6 +57,7 @@ export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, sn
         useGrid,
         snapGrid,
         gridSubd,
+        frameRect,
     }
     const json = JSON.stringify(saveData);
     const blob = new Blob([json], { type: "application/json" });
@@ -72,47 +73,27 @@ export function SaveFile(fileName: string, shapes: Shape[], useGrid: boolean, sn
     URL.revokeObjectURL(url);
 }
 
-export function LoadFile(
-    setFileName: (fileName: string) => void,
-    commit: (updater: (shapes: Shape[]) => Shape[]) => void,
-    setShowGrid: (showGrid: boolean) => void,
-    setSnapToGrid: (snapToGrid: boolean) => void,
-    setGridSubdivisions: (gridsubd: number) => void,
-): void {
-    // trigger file open dialog
-    const input = document.createElement("input")
-    input.type = "file";
-    input.accept = ".json";
-    input.click();
+export function LoadFile(): Promise<SaveData> {
+    return new Promise((resolve, reject) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
 
-    input.onchange = (event: Event) => {
-        const target = event.target as HTMLInputElement;
-        if (!target.files || target.files.length === 0) return;
-
-        const file = target.files[0];
-        const reader = new FileReader();
-
-        reader.onload = (evt) => {
-            if (!evt.target) return;
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return reject("No file selected");
 
             try {
-                const text = evt.target.result as string;
-                const loadData: SaveData = JSON.parse(text);
-
-                // Apply loaded data to state
-                setFileName(loadData.fileName);
-                commit(() => loadData.shapes);
-                setShowGrid(loadData.useGrid);
-                setSnapToGrid(loadData.snapGrid);
-                setGridSubdivisions(loadData.gridSubd);
-
-                AddToRecentFiles(text);
-            } catch (error) {
-                console.log("failed to load file.")
+                const text = await file.text();
+                const data: SaveData = JSON.parse(text);
+                resolve(data);
+            } catch (err) {
+                reject("Failed to parse JSON");
             }
         };
-        reader.readAsText(file);
-    }
+
+        input.click();
+    });
 }
 
 

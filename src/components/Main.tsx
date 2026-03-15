@@ -80,6 +80,12 @@ export default function Main() {
         editorRef.current.editorGrid.snapToGrid = snapToGrid;
     }, [snapToGrid]);
 
+    // sync showGrid
+    useEffect(() => {
+        if (!editorRef.current) return;
+        editorRef.current.editorGrid.showGrid = showGrid;
+    }, [showGrid]);
+
     // create editor
     useEffect(() => {
         editorRef.current = new Editor(
@@ -361,14 +367,17 @@ export default function Main() {
 
     function handleSave(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         if (!editorRef.current) return;
-        SaveFile(fileName, history.present.shapes, showGrid, snapToGrid, editorRef.current.editorGrid.gridSubdivisions);
+        SaveFile(fileName, history.present.shapes, editorRef.current.editorGrid.showGrid, editorRef.current.editorGrid.snapToGrid, editorRef.current.editorGrid.gridSubdivisions, frame);
     }
 
-    function handleLoad(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
+    async function handleLoad(_e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         if (!editorRef.current) return;
-
-        LoadFile(setFileName, editorRef.current.commit, setShowGrid, setSnapToGrid, editorRef.current.setGridSubdivisions);
+        const data = await LoadFile();
+        editorRef.current?.loadState(data);
+        setFileName(data.fileName);
+        setFrame(data.frameRect || frame);
     }
+
     const editor = editorRef.current;
     if (!editor) return;
 

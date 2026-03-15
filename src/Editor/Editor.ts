@@ -9,6 +9,7 @@ import { EditorGrid } from "../Editor/Grid";
 import { EditorHistory } from "./EditorHistory";
 import { EditorTools, type ToolEnum } from "./EditorTools";
 import type { Tool } from "../Tools/Tool";
+import type { SaveData } from "../components/SaveData";
 
 export class Editor {
     canvasRef: React.RefObject<HTMLCanvasElement | null> = React.createRef();
@@ -59,6 +60,17 @@ export class Editor {
         this.activeTool = activeTool;
 
         this.setTick = setTick;
+    }
+
+    loadState = (data: SaveData) => {
+        this.clearDocument();
+
+        this.commit(() => [...data.shapes]);
+
+        this.editorGrid.setShowGrid(data.useGrid);
+        this.editorGrid.snapToGrid = data.snapGrid;
+        this.setGridSubdivisions(data.gridSubd);
+        console.log("File loaded, ", this.history.present.shapes.length, " shapes loaded.");
     }
 
     setCanvas(canvas: HTMLCanvasElement) {
@@ -417,7 +429,7 @@ export class Editor {
         this.editorHistory.setShapeName(name, index);
     }
 
-    clearDocument(): void {
+    clearDocument() {
         this.editorHistory.setHistory({ past: [], present: { shapes: [] }, future: [] });
         this.setSelectedPointIndex(-1);
         this.setSelectedPathIndex(-1);

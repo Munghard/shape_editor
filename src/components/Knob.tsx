@@ -1,4 +1,4 @@
-import type { ToolEnum } from "./Main";
+import type { ToolEnum } from "../Editor/EditorTools"
 
 type KnobProps = {
     i: number

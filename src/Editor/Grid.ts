@@ -73,10 +73,15 @@ export class EditorGrid {
         this.editor = editor;
     }
     public editor: Editor;
+    public showGrid: boolean = false;
     public snapToGrid: boolean = false;
     public gridColor: string = "#ffffff";
     public gridAlpha: number = 0.1;
     public gridSubdivisions: number = 8;
+
+    setShowGrid(useGrid: boolean) {
+        this.showGrid = useGrid;
+    }
 
     ReDrawGrid() {
         var c = document.getElementById("CanvasGrid") as HTMLCanvasElement;

@@ -1,4 +1,4 @@
-import type { Shape } from "../Editor/Shape"
+import type { Rect, Shape } from "../Editor/Shape"
 
 export type SaveData = {
     id: string;
@@ -8,4 +8,6 @@ export type SaveData = {
     gridSubd: number;
     useGrid: boolean;
     snapGrid: boolean;
+
+    frameRect: Rect;
 }
